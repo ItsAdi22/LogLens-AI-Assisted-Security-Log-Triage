@@ -1,0 +1,45 @@
+name: Bug Report
+description: File a bug report to help us improve LogLens
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report an issue! Please do NOT post sensitive logs or credentials here.
+  - type: input
+    id: version
+    attributes:
+      label: LogLens Version
+      description: What version of LogLens are you running? (Run `loglens --version`)
+      placeholder: e.g. 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS and Python version
+      placeholder: e.g. Ubuntu 22.04, Python 3.12
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the Bug
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Minimal commands and synthetic log input to reproduce the behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true

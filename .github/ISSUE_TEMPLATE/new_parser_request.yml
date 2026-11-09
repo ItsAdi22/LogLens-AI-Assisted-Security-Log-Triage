@@ -1,0 +1,26 @@
+name: New Parser Request
+description: Request support for a new log format or daemon
+labels: ["parser", "enhancement"]
+body:
+  - type: input
+    id: daemon
+    attributes:
+      label: Service / Daemon Name
+      description: What service produces these logs? (e.g., Caddy, Docker, Postfix, Traefik)
+      placeholder: e.g. Caddy JSON Access Log
+    validations:
+      required: true
+  - type: textarea
+    id: sample_logs
+    attributes:
+      label: Synthetic / Sanitized Sample Logs
+      description: Provide 3-5 sanitized sample log lines. REMOVE ALL REAL PASSWORDS, PII, AND SENSITIVE IPS!
+    validations:
+      required: true
+  - type: textarea
+    id: fields
+    attributes:
+      label: Expected Normalized Fields
+      description: What fields should be extracted into the normalized Event? (e.g. client_ip, status_code, user)
+    validations:
+      required: true

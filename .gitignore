@@ -1,0 +1,53 @@
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Progress Tracker (do NOT touch or commit via git)
+PROGRESS_TRACKER.md
+.progress_tracker.md
+progress_tracker.md
+*.tracker.md
+
+# Python cache & bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Testing & Coverage
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.hypothesis/
+
+# Type checking & Linters
+.mypy_cache/
+.ruff_cache/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# SQLite database files from runs
+*.db
+*.sqlite
+*.sqlite3
+
+# Local environment & secrets
+.env
+.env.local
