@@ -104,6 +104,45 @@ class StorageManager:
                     (1, datetime.now(UTC).isoformat()),
                 )
 
+            if current_version < 2:
+                self._conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS settings (
+                        key TEXT PRIMARY KEY,
+                        value TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                    """
+                )
+                self._conn.execute(
+                    "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",
+                    (2, datetime.now(UTC).isoformat()),
+                )
+
+    def get_setting(self, key: str, default: str | None = None) -> str | None:
+        """Retrieve a stored configuration setting by key."""
+        cursor = self._conn.cursor()
+        cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
+        row = cursor.fetchone()
+        return str(row[0]) if row else default
+
+    def set_setting(self, key: str, value: str) -> None:
+        """Store or update a configuration setting."""
+        with self._conn:
+            self._conn.execute(
+                """
+                INSERT OR REPLACE INTO settings (key, value, updated_at)
+                VALUES (?, ?, ?)
+                """,
+                (key, value, datetime.now(UTC).isoformat()),
+            )
+
+    def get_all_settings(self) -> dict[str, str]:
+        """Retrieve all configuration settings as a dictionary."""
+        cursor = self._conn.cursor()
+        cursor.execute("SELECT key, value FROM settings")
+        return {str(row[0]): str(row[1]) for row in cursor.fetchall()}
+
     def save_run(self, report: Report, run_id: str | None = None) -> str:
         """Persist a complete Report run into SQLite."""
         actual_run_id = run_id or f"run-{uuid.uuid4().hex[:12]}"

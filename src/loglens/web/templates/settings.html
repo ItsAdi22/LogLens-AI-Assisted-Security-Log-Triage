@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}LogLens — Notifications & Integrations{% endblock %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 0 auto;">
+  <div style="margin-bottom: 2rem;">
+    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+      <a href="/" style="color: var(--accent-primary); text-decoration: none;">&larr; Dashboard</a> / Notifications & Settings
+    </div>
+    <h1 style="font-size: 1.8rem; font-weight: 700; letter-spacing: -0.02em;">Third-Party Alerts & Notifications</h1>
+    <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 0.25rem;">
+      Connect Telegram, Discord, or custom webhooks to receive real-time alerts when security threats or anomalous bursts are detected.
+    </p>
+  </div>
+
+  {% if saved %}
+    <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #6ee7b7; padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+      <span style="font-size: 1.25rem;">✓</span>
+      <div>
+        <strong>Settings Saved Successfully!</strong> Your notification credentials have been updated and are active.
+      </div>
+    </div>
+  {% endif %}
+
+  <form action="/settings" method="post">
+    <!-- Telegram Configuration Card -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+        <div>
+          <h3 style="font-size: 1.15rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+            <span>✈️</span> Telegram Bot Alerts
+          </h3>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem;">
+            Receive mobile and desktop push notifications with incident summaries and containment actions.
+          </p>
+        </div>
+        <div id="telegram-test-result">
+          <button type="button" class="btn btn-secondary" style="font-size: 0.85rem;"
+                  hx-post="/api/notify/test?channel=telegram"
+                  hx-include="closest form"
+                  hx-target="#telegram-test-result"
+                  hx-swap="innerHTML">
+            Test Telegram
+          </button>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem;">
+        <div>
+          <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; font-weight: 500;">
+            Telegram Bot Token
+          </label>
+          <input type="text" name="telegram_bot_token" value="{{ settings.telegram_bot_token|default('') }}"
+                 placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
+                 style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.6rem; font-family: var(--font-mono); font-size: 0.85rem;">
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+            Obtain from <a href="https://t.me/BotFather" target="_blank" style="color: var(--accent-primary);">@BotFather</a>.
+          </div>
+        </div>
+
+        <div>
+          <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; font-weight: 500;">
+            Chat ID / Channel ID
+          </label>
+          <input type="text" name="telegram_chat_id" value="{{ settings.telegram_chat_id|default('') }}"
+                 placeholder="123456789 or -100123456"
+                 style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.6rem; font-family: var(--font-mono); font-size: 0.85rem;">
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+            Get via <a href="https://t.me/userinfobot" target="_blank" style="color: var(--accent-primary);">@userinfobot</a>.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Discord Configuration Card -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+        <div>
+          <h3 style="font-size: 1.15rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+            <span>💬</span> Discord Webhook Alerts
+          </h3>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem;">
+            Posts formatted rich embeds with severity color-coding directly into your Discord channel.
+          </p>
+        </div>
+        <div id="discord-test-result">
+          <button type="button" class="btn btn-secondary" style="font-size: 0.85rem;"
+                  hx-post="/api/notify/test?channel=discord"
+                  hx-include="closest form"
+                  hx-target="#discord-test-result"
+                  hx-swap="innerHTML">
+            Test Discord
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; font-weight: 500;">
+          Discord Webhook URL
+        </label>
+        <input type="url" name="discord_webhook_url" value="{{ settings.discord_webhook_url|default('') }}"
+               placeholder="https://discord.com/api/webhooks/1234567890/token_string_here"
+               style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.6rem; font-family: var(--font-mono); font-size: 0.85rem;">
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+          In Discord: Channel Settings &rarr; Integrations &rarr; Webhooks &rarr; New Webhook.
+        </div>
+      </div>
+    </div>
+
+    <!-- Generic Webhook Card -->
+    <div class="card" style="margin-bottom: 2rem;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+        <div>
+          <h3 style="font-size: 1.15rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+            <span>🌐</span> Generic Webhook (SIEM / SOAR / Slack)
+          </h3>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem;">
+            Dispatches HMAC-SHA256 authenticated JSON payloads to custom endpoints, Slack, or automation runners.
+          </p>
+        </div>
+        <div id="webhook-test-result">
+          <button type="button" class="btn btn-secondary" style="font-size: 0.85rem;"
+                  hx-post="/api/notify/test?channel=webhook"
+                  hx-include="closest form"
+                  hx-target="#webhook-test-result"
+                  hx-swap="innerHTML">
+            Test Webhook
+          </button>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem;">
+        <div>
+          <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; font-weight: 500;">
+            Webhook Endpoint URL
+          </label>
+          <input type="url" name="generic_webhook_url" value="{{ settings.generic_webhook_url|default('') }}"
+                 placeholder="https://siem.mycompany.internal/api/loglens-events"
+                 style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.6rem; font-family: var(--font-mono); font-size: 0.85rem;">
+        </div>
+        <div>
+          <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; font-weight: 500;">
+            HMAC Secret Key (Optional)
+          </label>
+          <input type="password" name="generic_webhook_secret" value="{{ settings.generic_webhook_secret|default('') }}"
+                 placeholder="Shared secret token"
+                 style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.6rem; font-family: var(--font-mono); font-size: 0.85rem;">
+        </div>
+      </div>
+    </div>
+
+    <!-- Save Settings Button -->
+    <div style="display: flex; justify-content: flex-end; gap: 1rem; align-items: center;">
+      <a href="/" class="btn btn-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary" style="padding: 0.75rem 2rem; font-size: 1rem; font-weight: 600;">
+        💾 Save Notification Settings
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}

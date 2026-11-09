@@ -54,6 +54,7 @@ web = [
     "fastapi>=0.110.0",
     "uvicorn>=0.28.0",
     "jinja2>=3.1.3",
+    "python-multipart>=0.0.9",
 ]
 dev = [
     "pytest>=8.0.0",
@@ -95,6 +96,9 @@ select = [
 ignore = [
     "E501", # line too long (handled by formatter / sample logs)
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"src/loglens/web/app.py" = ["B008"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["loglens"]

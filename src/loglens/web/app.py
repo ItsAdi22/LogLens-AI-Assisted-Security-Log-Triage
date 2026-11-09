@@ -2,23 +2,44 @@
 
 from __future__ import annotations
 
+import html
+import logging
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
-from fastapi.responses import HTMLResponse
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
+from loglens.actions.exporter import generate_action_export
+from loglens.cluster import DrainClusterer
 from loglens.llm import LLMProvider, MockLLMProvider, TriageOrchestrator, get_provider
+from loglens.models import Event, Finding, LLMAssessment, Report, ReportMetadata
+from loglens.notify import DiscordNotifier, TelegramNotifier, WebhookNotifier
+from loglens.parsers import registry
 from loglens.redact import Redactor
+from loglens.rules import RuleEngine, get_builtin_rules
 from loglens.store import DEFAULT_DB_PATH, StorageManager
 
 MODULE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = MODULE_DIR / "static"
 TEMPLATES_DIR = MODULE_DIR / "templates"
+
+logger = logging.getLogger(__name__)
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -38,6 +59,42 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         return response
+
+
+def resolve_notifier(channel: str, settings: dict[str, str]) -> Any:
+    """Resolve and configure a notification backend using stored settings or env vars."""
+    norm = channel.strip().lower()
+    if norm == "telegram":
+        token = settings.get("telegram_bot_token") or os.environ.get("TELEGRAM_BOT_TOKEN", "")
+        chat = settings.get("telegram_chat_id") or os.environ.get("TELEGRAM_CHAT_ID", "")
+        return TelegramNotifier(bot_token=token, chat_id=chat, min_severity="info")
+    if norm == "discord":
+        url = settings.get("discord_webhook_url") or os.environ.get("DISCORD_WEBHOOK_URL", "")
+        return DiscordNotifier(webhook_url=url, min_severity="info")
+    if norm == "webhook":
+        url = settings.get("generic_webhook_url") or os.environ.get("LOGLENS_WEBHOOK_URL", "")
+        sec = settings.get("generic_webhook_secret") or os.environ.get("LOGLENS_WEBHOOK_SECRET", "")
+        return WebhookNotifier(webhook_url=url, secret=sec, min_severity="info")
+    raise HTTPException(status_code=400, detail=f"Unsupported notification channel: '{channel}'")
+
+
+def create_test_finding() -> Finding:
+    """Create a synthetic finding payload for testing notification delivery."""
+    return Finding(
+        id="test-alert-001",
+        cluster_ids=["c-test"],
+        rule_ids=["UI-NOTIFICATION-TEST"],
+        rule_severity="medium",
+        llm=LLMAssessment(
+            summary="Verification alert dispatched from LogLens Web UI settings panel.",
+            attack_type="integration_test",
+            severity="medium",
+            confidence=1.0,
+            evidence=["Manual notification test triggered via Web UI settings panel"],
+            recommended_actions=["Verification confirmed. No further action needed."],
+            false_positive_likelihood="low",
+        ),
+    )
 
 
 def create_app(
@@ -73,8 +130,6 @@ def create_app(
     if llm_provider is not None:
         provider = llm_provider
     elif provider_name == "mock":
-        from loglens.models import LLMAssessment
-
         default_assessment = LLMAssessment(
             summary="Automated triage assessment from AI reasoning engine.",
             attack_type="security_anomaly",
@@ -112,7 +167,7 @@ def create_app(
     @app.get("/health")
     def health_check() -> dict[str, str]:
         """Health check endpoint."""
-        return {"status": "ok", "version": "0.1.0"}
+        return {"status": "ok", "version": "1.0.0"}
 
     @app.get("/", response_class=HTMLResponse, dependencies=[Depends(verify_token)])
     def dashboard(request: Request) -> HTMLResponse:
@@ -130,6 +185,237 @@ def create_app(
             },
         )
 
+    @app.get("/analyze", response_class=HTMLResponse, dependencies=[Depends(verify_token)])
+    def analyze_page(request: Request) -> HTMLResponse:
+        """Render the self-service log analysis and ingestion interface."""
+        return templates.TemplateResponse(
+            request=request,
+            name="analyze.html",
+            context={},
+        )
+
+    @app.post("/analyze", dependencies=[Depends(verify_token)])
+    async def analyze_submit(
+        file: UploadFile | None = File(None),
+        log_text: str | None = Form(None),
+        format: str = Form("auto"),
+        provider: str = Form("mock"),
+        enable_llm: bool = Form(False),
+        notify_on_complete: bool = Form(False),
+    ) -> RedirectResponse:
+        """Process an uploaded log file or pasted raw log text, running triage and saving the run."""
+        text_content = ""
+        source_name = "pasted-snippet"
+
+        if file and file.filename:
+            file_bytes = await file.read()
+            if file_bytes:
+                text_content = file_bytes.decode("utf-8", errors="replace")
+                source_name = file.filename
+
+        if not text_content and log_text and log_text.strip():
+            text_content = log_text.strip()
+            source_name = "raw-log-input"
+
+        if not text_content.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No log content provided. Please upload a file or paste log text.",
+            )
+
+        raw_lines = text_content.splitlines()
+
+        # Resolve log parser
+        p = None
+        if format != "auto":
+            p = registry.get(format)
+        if not p:
+            sample = [line for line in raw_lines[:50] if line.strip()]
+            p = registry.autodetect(sample) or registry.get("generic")
+        if not p:
+            p = registry.get("generic")
+            if not p:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="No log parser could be resolved.",
+                )
+
+        # Ingest and cluster patterns via Drain3
+        clusterer = DrainClusterer()
+        all_events: list[Event] = []
+        total_lines = 0
+        parsed_count = 0
+        unparsed_count = 0
+
+        for line_num, line in enumerate(raw_lines, 1):
+            sline = line.strip()
+            if not sline:
+                continue
+            total_lines += 1
+            event = p.parse_line(line, line_num)
+            if event is None:
+                unparsed_count += 1
+                continue
+            parsed_count += 1
+            all_events.append(event)
+            clusterer.add_event(event)
+
+        clusters = clusterer.get_clusters()
+
+        # Evaluate detection rules
+        loaded_rules = get_builtin_rules()
+        rule_engine = RuleEngine(loaded_rules)
+        findings: list[Finding] = rule_engine.evaluate(all_events, clusters)
+
+        # LLM forensic triage
+        triage_stats = None
+        if enable_llm and clusters:
+            p_inst: LLMProvider
+            if provider == "mock":
+                p_inst = MockLLMProvider(
+                    default_response=LLMAssessment(
+                        summary=f"Automated AI triage of {source_name}. Attack indicators classified with high confidence.",
+                        attack_type=(
+                            "credential_access"
+                            if any("bruteforce" in f.rule_ids for f in findings)
+                            else "security_anomaly"
+                        ),
+                        severity="high" if findings else "low",
+                        confidence=0.95,
+                        evidence=["Anomalous cluster pattern detected in ingested logs"],
+                        recommended_actions=["Review source IPs and verify firewall drop rules."],
+                        false_positive_likelihood="low",
+                    )
+                )
+            else:
+                p_inst = get_provider(provider)
+
+            triage_orch = TriageOrchestrator(
+                provider=p_inst,
+                redactor=Redactor(level="standard"),
+            )
+            findings, triage_stats = triage_orch.triage(clusters, findings)
+
+        # Build and persist report
+        meta = ReportMetadata(
+            generated_at=datetime.now(UTC),
+            log_source=source_name,
+            total_lines=total_lines,
+            parsed_events=parsed_count,
+            unparsed_lines=unparsed_count,
+            total_clusters=len(clusters),
+            findings_count=len(findings),
+        )
+        report = Report(
+            metadata=meta,
+            findings=findings,
+            clusters=clusters,
+            stats=triage_stats or {},
+        )
+        new_run_id = storage.save_run(report)
+
+        # Optional auto-dispatch notification if threats are detected
+        if notify_on_complete and findings:
+            saved_settings = storage.get_all_settings()
+            for ch in ("telegram", "discord", "webhook"):
+                try:
+                    notif = resolve_notifier(ch, saved_settings)
+                    if getattr(notif, "_is_configured", lambda: False)():
+                        notif.send_digest(findings, meta)
+                except Exception as exc:
+                    logger.warning("Auto-dispatch notification to %s failed: %s", ch, exc)
+
+        return RedirectResponse(
+            url=f"/runs/{new_run_id}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    @app.get("/settings", response_class=HTMLResponse, dependencies=[Depends(verify_token)])
+    def settings_page(request: Request) -> HTMLResponse:
+        """Render notification credentials and webhook integration configuration."""
+        settings_dict = storage.get_all_settings()
+        return templates.TemplateResponse(
+            request=request,
+            name="settings.html",
+            context={
+                "settings": settings_dict,
+                "saved": False,
+            },
+        )
+
+    @app.post("/settings", response_class=HTMLResponse, dependencies=[Depends(verify_token)])
+    async def settings_save(
+        request: Request,
+        telegram_bot_token: str = Form(""),
+        telegram_chat_id: str = Form(""),
+        discord_webhook_url: str = Form(""),
+        generic_webhook_url: str = Form(""),
+        generic_webhook_secret: str = Form(""),
+    ) -> HTMLResponse:
+        """Save third-party notification credentials to the local settings store."""
+        storage.set_setting("telegram_bot_token", telegram_bot_token.strip())
+        storage.set_setting("telegram_chat_id", telegram_chat_id.strip())
+        storage.set_setting("discord_webhook_url", discord_webhook_url.strip())
+        storage.set_setting("generic_webhook_url", generic_webhook_url.strip())
+        storage.set_setting("generic_webhook_secret", generic_webhook_secret.strip())
+
+        settings_dict = storage.get_all_settings()
+        return templates.TemplateResponse(
+            request=request,
+            name="settings.html",
+            context={
+                "settings": settings_dict,
+                "saved": True,
+            },
+        )
+
+    @app.post("/api/notify/test", response_class=HTMLResponse, dependencies=[Depends(verify_token)])
+    async def test_notification(
+        channel: str = "telegram",
+        telegram_bot_token: str | None = Form(None),
+        telegram_chat_id: str | None = Form(None),
+        discord_webhook_url: str | None = Form(None),
+        generic_webhook_url: str | None = Form(None),
+        generic_webhook_secret: str | None = Form(None),
+    ) -> HTMLResponse:
+        """Send a live test alert to verify notification credentials via HTMX."""
+        settings = storage.get_all_settings()
+        if telegram_bot_token is not None:
+            settings["telegram_bot_token"] = telegram_bot_token.strip()
+        if telegram_chat_id is not None:
+            settings["telegram_chat_id"] = telegram_chat_id.strip()
+        if discord_webhook_url is not None:
+            settings["discord_webhook_url"] = discord_webhook_url.strip()
+        if generic_webhook_url is not None:
+            settings["generic_webhook_url"] = generic_webhook_url.strip()
+        if generic_webhook_secret is not None:
+            settings["generic_webhook_secret"] = generic_webhook_secret.strip()
+
+        try:
+            notif = resolve_notifier(channel, settings)
+            if hasattr(notif, "cooldown"):
+                notif.cooldown.clear()
+            test_finding = create_test_finding()
+            delivered = notif.send_alert(test_finding)
+            if delivered:
+                return HTMLResponse(
+                    '<span style="color: #10b981; font-weight: 600; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.25rem;">'
+                    '<span>✓</span> Test Notification Delivered Successfully!'
+                    '</span>'
+                )
+            else:
+                return HTMLResponse(
+                    '<span style="color: #ef4444; font-weight: 600; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.25rem;">'
+                    '<span>✗</span> Delivery Failed — Check credentials & chat/webhook permissions.'
+                    '</span>'
+                )
+        except Exception as exc:
+            return HTMLResponse(
+                f'<span style="color: #ef4444; font-weight: 600; font-size: 0.85rem;">'
+                f'<span>✗</span> Error: {html.escape(str(exc))}'
+                f'</span>'
+            )
+
     @app.get("/runs/{run_id}", response_class=HTMLResponse, dependencies=[Depends(verify_token)])
     def run_detail(request: Request, run_id: str) -> HTMLResponse:
         """Render detailed view for a single triage run."""
@@ -145,6 +431,104 @@ def create_app(
                 "report": report,
             },
         )
+
+    @app.post(
+        "/runs/{run_id}/notify",
+        response_class=HTMLResponse,
+        dependencies=[Depends(verify_token)],
+    )
+    def notify_run_digest(
+        run_id: str,
+        channel: str = "telegram",
+    ) -> HTMLResponse:
+        """Dispatch a full run digest to Telegram or Discord."""
+        report = storage.get_run(run_id)
+        if report is None:
+            raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
+
+        settings = storage.get_all_settings()
+        notifier = resolve_notifier(channel, settings)
+        if hasattr(notifier, "cooldown"):
+            notifier.cooldown.clear()
+
+        try:
+            delivered = notifier.send_digest(report.findings, report.metadata)
+            if delivered:
+                msg = f"✓ Run digest dispatched to {channel.capitalize()}!"
+                return HTMLResponse(
+                    f'<span style="color: #10b981; font-weight: 600; font-size: 0.85rem; border: 1px solid #10b981; padding: 0.25rem 0.5rem; border-radius: 4px; background: rgba(16, 185, 129, 0.1);">{msg}</span>'
+                )
+            else:
+                msg = f"✗ Failed sending to {channel.capitalize()} (unconfigured or rejected)."
+                return HTMLResponse(
+                    f'<span style="color: #ef4444; font-weight: 600; font-size: 0.85rem; border: 1px solid #ef4444; padding: 0.25rem 0.5rem; border-radius: 4px; background: rgba(239, 68, 68, 0.1);">{msg}</span>'
+                )
+        except Exception as exc:
+            return HTMLResponse(
+                f'<span style="color: #ef4444; font-weight: 600; font-size: 0.85rem;">Error: {html.escape(str(exc))}</span>'
+            )
+
+    @app.post(
+        "/runs/{run_id}/findings/{finding_id}/notify",
+        response_class=HTMLResponse,
+        dependencies=[Depends(verify_token)],
+    )
+    def notify_single_finding(
+        run_id: str,
+        finding_id: str,
+        channel: str = "telegram",
+    ) -> HTMLResponse:
+        """Dispatch an individual finding alert to Telegram or Discord."""
+        report = storage.get_run(run_id)
+        if report is None:
+            raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
+
+        target_finding = next((f for f in report.findings if f.id == finding_id), None)
+        if target_finding is None:
+            raise HTTPException(status_code=404, detail=f"Finding '{finding_id}' not found")
+
+        settings = storage.get_all_settings()
+        notifier = resolve_notifier(channel, settings)
+        if hasattr(notifier, "cooldown"):
+            notifier.cooldown.clear()
+
+        try:
+            delivered = notifier.send_alert(target_finding, report.metadata)
+            if delivered:
+                msg = f"✓ Finding alert delivered to {channel.capitalize()}!"
+                return HTMLResponse(
+                    f'<span style="color: #10b981; font-weight: 600; font-size: 0.8rem; border: 1px solid #10b981; padding: 0.2rem 0.4rem; border-radius: 4px; background: rgba(16, 185, 129, 0.1);">{msg}</span>'
+                )
+            else:
+                msg = f"✗ Delivery to {channel.capitalize()} failed. Check settings."
+                return HTMLResponse(
+                    f'<span style="color: #ef4444; font-weight: 600; font-size: 0.8rem; border: 1px solid #ef4444; padding: 0.2rem 0.4rem; border-radius: 4px; background: rgba(239, 68, 68, 0.1);">{msg}</span>'
+                )
+        except Exception as exc:
+            return HTMLResponse(
+                f'<span style="color: #ef4444; font-weight: 600; font-size: 0.8rem;">Error: {html.escape(str(exc))}</span>'
+            )
+
+    @app.get(
+        "/runs/{run_id}/actions/{target}",
+        response_class=PlainTextResponse,
+        dependencies=[Depends(verify_token)],
+    )
+    def export_firewall_actions(
+        run_id: str,
+        target: str,
+    ) -> PlainTextResponse:
+        """Generate advisory perimeter firewall mitigation drop rules in plain text."""
+        report = storage.get_run(run_id)
+        if report is None:
+            raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
+
+        valid_targets = {"nftables", "iptables", "fail2ban", "cloudflare"}
+        if target not in valid_targets:
+            raise HTTPException(status_code=400, detail=f"Unsupported target format: '{target}'")
+
+        content = generate_action_export(report, target=target)  # type: ignore[arg-type]
+        return PlainTextResponse(content)
 
     @app.post(
         "/runs/{run_id}/findings/{finding_id}/explain",
@@ -167,12 +551,10 @@ def create_app(
 
         # If already assessed, return card immediately
         if target_finding.llm is None:
-            # Locate clusters linked to this finding
             matched_clusters = [c for c in report.clusters if c.id in target_finding.cluster_ids]
             if not matched_clusters:
                 matched_clusters = report.clusters[:2]
 
-            # Execute triage via orchestrator
             triaged_findings, _ = orchestrator.triage(matched_clusters, [target_finding])
             if triaged_findings and triaged_findings[0].llm:
                 new_assessment = triaged_findings[0].llm

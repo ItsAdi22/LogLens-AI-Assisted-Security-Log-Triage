@@ -111,7 +111,7 @@ def main() -> None:
     provider = MockLLMProvider(default_response=default_assessment)
     orchestrator = TriageOrchestrator(provider, redactor)
     t0 = time.perf_counter()
-    triaged_findings, triage_stats = orchestrator.triage(clusters, findings=findings)
+    triaged_findings, _triage_stats = orchestrator.triage(clusters, findings=findings)
     elapsed = time.perf_counter() - t0
     console.print(f"   [green]✓[/green] Completed AI assessment across findings in [bold]{elapsed:.3f}s[/bold].")
 
@@ -132,6 +132,7 @@ def main() -> None:
 
     # Report export
     from datetime import UTC, datetime
+
     from loglens.models import Report, ReportMetadata
 
     report_out = Path("walkthrough_report.html")

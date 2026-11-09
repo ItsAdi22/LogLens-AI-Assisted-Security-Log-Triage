@@ -20,7 +20,10 @@ def create_sample_report() -> Report:
         count=15,
         first_seen=datetime.now(UTC),
         last_seen=datetime.now(UTC),
-        top_fields={"user": [("admin", 10), ("root", 5)]},
+        top_fields={
+            "user": [("admin", 10), ("root", 5)],
+            "ip": [("203.0.113.195", 15)],
+        },
     )
     cluster2 = Cluster(
         id="c-02",
@@ -66,7 +69,7 @@ def test_health_check(tmp_path: Path) -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert data["version"] == "0.1.0"
+    assert data["version"] == "1.0.0"
 
 
 def test_security_headers(tmp_path: Path) -> None:
@@ -218,3 +221,174 @@ def test_api_endpoints(tmp_path: Path) -> None:
     run_data = resp_run.json()
     assert run_data["metadata"]["total_lines"] == 50
     assert len(run_data["findings"]) == 1
+
+
+def test_analyze_page_get(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    response = client.get("/analyze")
+    assert response.status_code == 200
+    assert "Analyze & Triage Logs" in response.text
+    assert "Log Input Source" in response.text
+
+
+def test_analyze_submit_pasted_text(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    log_snippet = (
+        "Nov 10 12:00:01 server sshd[1024]: Failed password for root from 198.51.100.22 port 51234 ssh2\n"
+        "Nov 10 12:00:02 server sshd[1025]: Failed password for root from 198.51.100.22 port 51235 ssh2\n"
+    )
+
+    response = client.post(
+        "/analyze",
+        data={
+            "log_text": log_snippet,
+            "format": "auth",
+            "provider": "mock",
+            "enable_llm": "true",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    redirect_url = response.headers["location"]
+    assert redirect_url.startswith("/runs/run-")
+
+    # Verify run view
+    resp_run = client.get(redirect_url)
+    assert resp_run.status_code == 200
+    assert "Failed password for root" in resp_run.text
+
+
+def test_analyze_submit_uploaded_file(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    log_snippet = (
+        "Nov 10 12:00:01 server sshd[1024]: Accepted publickey for user admin from 198.51.100.22 port 51234 ssh2\n"
+    )
+
+    response = client.post(
+        "/analyze",
+        data={"format": "auto", "provider": "mock"},
+        files={"file": ("test_auth.log", log_snippet.encode("utf-8"), "text/plain")},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    redirect_url = response.headers["location"]
+
+    resp_run = client.get(redirect_url)
+    assert resp_run.status_code == 200
+    assert "test_auth.log" in resp_run.text
+
+
+def test_analyze_submit_empty_fails(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    response = client.post(
+        "/analyze",
+        data={"log_text": "   ", "format": "auto"},
+    )
+    assert response.status_code == 400
+
+
+def test_settings_page_and_save(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    # GET /settings
+    res_get = client.get("/settings")
+    assert res_get.status_code == 200
+    assert "Third-Party Alerts & Notifications" in res_get.text
+
+    # POST /settings
+    res_post = client.post(
+        "/settings",
+        data={
+            "telegram_bot_token": "tok123",
+            "telegram_chat_id": "chat456",
+            "discord_webhook_url": "https://discord.com/webhook/test",
+            "generic_webhook_url": "https://example.com/siem",
+            "generic_webhook_secret": "sec789",
+        },
+    )
+    assert res_post.status_code == 200
+    assert "Settings Saved Successfully!" in res_post.text
+    assert "tok123" in res_post.text
+    assert "chat456" in res_post.text
+
+
+def test_notify_test_api(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    # Telegram without token -> delivery failed
+    res_fail = client.post("/api/notify/test?channel=telegram")
+    assert res_fail.status_code == 200
+    assert "Delivery Failed" in res_fail.text
+
+    # Unsupported channel
+    res_bad = client.post("/api/notify/test?channel=unsupported")
+    assert res_bad.status_code == 200
+    assert "Error:" in res_bad.text
+
+
+def test_run_notify_and_finding_notify(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    storage = StorageManager(db_file)
+    report = create_sample_report()
+    run_id = storage.save_run(report, run_id="run-notify-123")
+    storage.close()
+
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    # Digest notify (unconfigured)
+    resp_digest = client.post(f"/runs/{run_id}/notify?channel=telegram")
+    assert resp_digest.status_code == 200
+    assert "Failed sending" in resp_digest.text or "Error" in resp_digest.text
+
+    # Finding notify (unconfigured)
+    resp_finding = client.post(f"/runs/{run_id}/findings/f-01/notify?channel=discord")
+    assert resp_finding.status_code == 200
+    assert "Delivery to Discord failed" in resp_finding.text or "Error" in resp_finding.text
+
+
+def test_export_firewall_actions(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    storage = StorageManager(db_file)
+    report = create_sample_report()
+    run_id = storage.save_run(report, run_id="run-fw-123")
+    storage.close()
+
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    # nftables
+    resp_nft = client.get(f"/runs/{run_id}/actions/nftables")
+    assert resp_nft.status_code == 200
+    assert "LOGLENS GENERATED ADVISORY ACTIONS" in resp_nft.text
+
+    # iptables
+    resp_ipt = client.get(f"/runs/{run_id}/actions/iptables")
+    assert resp_ipt.status_code == 200
+    assert "iptables" in resp_ipt.text
+
+    # cloudflare
+    resp_cf = client.get(f"/runs/{run_id}/actions/cloudflare")
+    assert resp_cf.status_code == 200
+    assert "203.0.113.195" in resp_cf.text
+
+    # invalid target
+    resp_inv = client.get(f"/runs/{run_id}/actions/invalid")
+    assert resp_inv.status_code == 400
+

@@ -227,6 +227,8 @@
     </a>
     <nav>
       <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a>
+      <a href="/analyze" class="{% if request.url.path.startswith('/analyze') %}active{% endif %}" style="color: var(--accent-primary); font-weight: 600;">+ New Analysis</a>
+      <a href="/settings" class="{% if request.url.path.startswith('/settings') %}active{% endif %}">🔔 Alerts & Settings</a>
       <a href="/api/stats" target="_blank">API Stats</a>
       <a href="https://github.com/ItsAdi22/LogLens-AI-Assisted-Security-Log-Triage" target="_blank" rel="noopener">GitHub</a>
     </nav>
@@ -237,7 +239,7 @@
   </main>
 
   <footer>
-    LogLens v0.1.0 — Lightweight, local-first AI-assisted security log triage &bull; Apache-2.0
+    LogLens v1.0.0 — Lightweight, local-first AI-assisted security log triage &bull; Apache-2.0
   </footer>
 </body>
 </html>

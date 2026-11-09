@@ -173,3 +173,19 @@ def test_storage_global_and_timeline_stats() -> None:
     assert timeline[0]["total_findings"] == 1
 
     storage.close()
+
+
+def test_storage_settings() -> None:
+    storage = StorageManager(db_path=":memory:")
+    assert storage.get_setting("telegram_bot_token") is None
+    assert storage.get_setting("telegram_bot_token", default="default-tok") == "default-tok"
+
+    storage.set_setting("telegram_bot_token", "123456:ABC-DEF")
+    assert storage.get_setting("telegram_bot_token") == "123456:ABC-DEF"
+
+    storage.set_setting("discord_webhook_url", "https://discord.com/webhook")
+    all_settings = storage.get_all_settings()
+    assert all_settings["telegram_bot_token"] == "123456:ABC-DEF"
+    assert all_settings["discord_webhook_url"] == "https://discord.com/webhook"
+
+    storage.close()

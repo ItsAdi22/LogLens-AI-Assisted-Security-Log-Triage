@@ -46,6 +46,7 @@ def seed_sample_data(db_path: Path) -> None:
                 events.append(ev)
                 clusterer.add_event(ev)
         from datetime import UTC, datetime
+
         from loglens.models import Report, ReportMetadata
 
         clusters = clusterer.get_clusters()

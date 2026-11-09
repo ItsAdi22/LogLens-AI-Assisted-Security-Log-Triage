@@ -84,5 +84,23 @@
       </div>
     {% endif %}
   </div>
-</div>
 
+  <!-- Finding Alert Notification Row -->
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-subtle);">
+    <div id="finding-{{ finding.id }}-alert-status" style="font-size: 0.8rem; color: var(--text-muted);"></div>
+    <div style="display: flex; gap: 0.4rem;">
+      <button type="button" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;"
+              hx-post="/runs/{{ run_id }}/findings/{{ finding.id }}/notify?channel=telegram"
+              hx-target="#finding-{{ finding.id }}-alert-status"
+              hx-swap="innerHTML">
+        ✈️ Telegram Alert
+      </button>
+      <button type="button" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;"
+              hx-post="/runs/{{ run_id }}/findings/{{ finding.id }}/notify?channel=discord"
+              hx-target="#finding-{{ finding.id }}-alert-status"
+              hx-swap="innerHTML">
+        💬 Discord Alert
+      </button>
+    </div>
+  </div>
+</div>
