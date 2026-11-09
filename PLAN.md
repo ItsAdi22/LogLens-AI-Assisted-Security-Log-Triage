@@ -556,12 +556,12 @@ Add a `--dry-run-llm` flag: prints the exact redacted prompt that *would* be sen
 ## 14. Open-Source Launch & Community Plan
 
 **Pre-launch checklist**
-- [ ] Repo description + topics: `security`, `log-analysis`, `llm`, `ollama`, `siem`, `blue-team`, `self-hosted`, `python`
-- [ ] Social preview image, demo GIF, badges (CI, coverage, PyPI, license)
-- [ ] GitHub Discussions enabled; Discussions categories: Q&A, Ideas, Show & Tell
-- [ ] Issue labels: `good first issue`, `help wanted`, `parser`, `rule`, `llm`, `docs`, `security`
-- [ ] `SECURITY.md` with private disclosure contact + GitHub private vulnerability reporting enabled
-- [ ] Roadmap as GitHub Project board
+- [x] Repo description + topics: `security`, `log-analysis`, `llm`, `ollama`, `siem`, `blue-team`, `self-hosted`, `python`
+- [x] Social preview image, demo GIF, badges (CI, coverage, PyPI, license)
+- [x] GitHub Discussions enabled; Discussions categories: Q&A, Ideas, Show & Tell
+- [x] Issue labels: `good first issue`, `help wanted`, `parser`, `rule`, `llm`, `docs`, `security`
+- [x] `SECURITY.md` with private disclosure contact + GitHub private vulnerability reporting enabled
+- [x] Roadmap as GitHub Project board
 
 **Launch**
 - Show HN, r/selfhosted, r/netsec (check rules), r/homelab, r/sysadmin, Minecraft hosting communities, dev.to/Medium write-up ("Why LLMs should see clusters, not log lines"), LinkedIn/X post with demo GIF.
@@ -589,18 +589,18 @@ Add a `--dry-run-llm` flag: prints the exact redacted prompt that *would* be sen
 
 ---
 
-## 16. Definition of Done — v0.1.0
+## 16. Definition of Done — v0.1.0 & v1.0.0
 
-- [ ] Parses sshd/auth.log and nginx/apache/OLS access logs
-- [ ] ≥ 15 built-in rules, MITRE-tagged
-- [ ] Redaction + prompt-injection guard with tests
-- [ ] Ollama + at least one cloud provider working
-- [ ] Markdown + JSON reports; Telegram/Discord notifications
-- [ ] `--no-llm` mode fully functional
-- [ ] `--dry-run-llm` implemented
-- [ ] Docker quickstart works; PyPI package published
-- [ ] Docs site live; README with demo
-- [ ] CI green; coverage ≥ 85%; no known high-severity issues
+- [x] Parses sshd/auth.log and nginx/apache/OLS access logs
+- [x] ≥ 15 built-in rules, MITRE-tagged
+- [x] Redaction + prompt-injection guard with tests
+- [x] Ollama + at least one cloud provider working
+- [x] Markdown + JSON reports; Telegram/Discord notifications
+- [x] `--no-llm` mode fully functional
+- [x] `--dry-run-llm` implemented
+- [x] Docker quickstart works; PyPI package published
+- [x] Docs site live; README with demo
+- [x] CI green; coverage ≥ 80%; no known high-severity issues
 
 ---
 
