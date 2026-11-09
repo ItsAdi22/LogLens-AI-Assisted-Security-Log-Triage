@@ -12,8 +12,18 @@ from rich.table import Table
 from loglens import __version__
 from loglens.cluster import DrainClusterer
 from loglens.ingest import FileReader, LogSource, StdinReader
-from loglens.models import Event
+from loglens.llm import (
+    LLMCache,
+    TokenBudget,
+    TriageOrchestrator,
+    get_provider,
+    wrap_untrusted_data,
+)
+from loglens.llm.consent import verify_cloud_consent
+from loglens.llm.prompts.loader import format_cluster_for_llm
+from loglens.models import Event, Finding
 from loglens.parsers import Parser, registry
+from loglens.redact import Redactor
 from loglens.rules import (
     RuleEngine,
     get_builtin_rules,
@@ -32,7 +42,13 @@ rules_app = typer.Typer(
     help="Manage, validate, and test LogLens detection rules.",
     no_args_is_help=True,
 )
+providers_app = typer.Typer(
+    name="providers",
+    help="Inspect and verify LLM triage provider connectivity.",
+    no_args_is_help=True,
+)
 app.add_typer(rules_app, name="rules")
+app.add_typer(providers_app, name="providers")
 
 console = Console()
 
@@ -74,13 +90,13 @@ def analyze_command(
             help="Log format (auto, auth, web, syslog, json, generic).",
         ),
     ] = "auto",
-    no_llm: Annotated[
+    llm: Annotated[
         bool,
         typer.Option(
-            "--no-llm",
-            help="Run in deterministic mode without calling an LLM.",
+            "--llm/--no-llm",
+            help="Enable or disable LLM-assisted triage.",
         ),
-    ] = True,
+    ] = False,
     rules_dir: Annotated[
         str | None,
         typer.Option(
@@ -93,9 +109,45 @@ def analyze_command(
         str,
         typer.Option(
             "--provider",
-            help="LLM provider (ollama, openai, gemini, anthropic).",
+            help="LLM provider (ollama, openai, gemini, anthropic, mock).",
         ),
     ] = "ollama",
+    model: Annotated[
+        str | None,
+        typer.Option(
+            "--model",
+            "-m",
+            help="Model name or identifier for LLM provider.",
+        ),
+    ] = None,
+    base_url: Annotated[
+        str | None,
+        typer.Option(
+            "--base-url",
+            help="Custom endpoint URL for LLM provider (Ollama or OpenAI-compatible).",
+        ),
+    ] = None,
+    redaction: Annotated[
+        str,
+        typer.Option(
+            "--redaction",
+            help="Redaction level for sensitive indicators (strict, standard, off).",
+        ),
+    ] = "standard",
+    dry_run_llm: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run-llm",
+            help="Inspect redacted cluster payloads and prompts without making LLM API calls.",
+        ),
+    ] = False,
+    agree_cloud_llm: Annotated[
+        bool,
+        typer.Option(
+            "--agree-cloud-llm",
+            help="Consent to sending anonymized cluster data to cloud LLM providers.",
+        ),
+    ] = False,
     out: Annotated[
         str | None,
         typer.Option(
@@ -203,9 +255,79 @@ def analyze_command(
         loaded_rules.extend(load_rules_from_directory(Path(rules_dir)))
 
     rule_engine = RuleEngine(loaded_rules)
-    findings = rule_engine.evaluate(all_events, clusters)
+    findings: list[Finding] = rule_engine.evaluate(all_events, clusters)
 
-    # 4. Display Summary Tables
+    # 4. Handle Dry-Run LLM
+    if dry_run_llm:
+        redaction_mode = "standard" if redaction not in ("off", "standard", "strict") else redaction
+        redactor = Redactor(level=redaction_mode)  # type: ignore[arg-type]
+
+        console.print(
+            Panel(
+                f"[bold cyan]DRY RUN: LLM Triage Payload Preview[/bold cyan]\n"
+                f"Provider: {provider} | Model: {model or 'default'} | Redaction: {redaction_mode}\n"
+                f"Clusters targeted for triage: {min(len(clusters), 5)} of {len(clusters)}",
+                border_style="cyan",
+            )
+        )
+
+        for c in clusters[:3]:
+            redacted_c = redactor.redact_cluster(c)
+            c_rule_ids = [f.rule_ids[0] for f in findings if c.id in f.cluster_ids and f.rule_ids]
+            formatted_data = format_cluster_for_llm(redacted_c, c_rule_ids)
+            wrapped_data = wrap_untrusted_data(formatted_data)
+
+            console.print(f"[bold yellow]=== Cluster {c.id} Prompt Payload ===[/bold yellow]")
+            console.print(wrapped_data)
+            console.print()
+
+        console.print(
+            f"[dim]Dry-run complete. {len(clusters)} clusters prepared for LLM analysis without network dispatch.[/dim]"
+        )
+        raise typer.Exit(code=0)
+
+    # 5. LLM Triage Execution (if --llm enabled)
+    triage_stats = None
+    if llm:
+        try:
+            llm_provider = get_provider(
+                name=provider,
+                model=model,
+                base_url=base_url,
+            )
+        except Exception as e:
+            console.print(f"[bold red]LLM Provider Error:[/bold red] {e}")
+            raise typer.Exit(code=1) from e
+
+        # Check cloud consent
+        if not verify_cloud_consent(
+            llm_provider, explicit_agreement=agree_cloud_llm, console=console
+        ):
+            console.print(
+                "[bold red]Aborted:[/bold red] Cloud LLM consent not granted. "
+                "Pass --agree-cloud-llm or set LOGLENS_AGREE_CLOUD_LLM=1 to proceed."
+            )
+            raise typer.Exit(code=1)
+
+        redaction_mode = "standard" if redaction not in ("off", "standard", "strict") else redaction
+        redactor = Redactor(level=redaction_mode)  # type: ignore[arg-type]
+        cache = LLMCache()
+        token_budget = TokenBudget()
+
+        orchestrator = TriageOrchestrator(
+            provider=llm_provider,
+            redactor=redactor,
+            cache=cache,
+            token_budget=token_budget,
+        )
+
+        console.print(
+            f"[bold blue]LogLens AI[/bold blue] triaging top security clusters using "
+            f"[bold cyan]{llm_provider.name}[/bold cyan]..."
+        )
+        findings, triage_stats = orchestrator.triage(clusters, findings)
+
+    # 6. Display Summary Tables
     rate = (parsed_count / total_lines * 100) if total_lines > 0 else 0.0
 
     table = Table(title="Log Parsing Summary", show_header=True, header_style="bold cyan")
@@ -234,7 +356,7 @@ def analyze_command(
 
     console.print(table)
 
-    # 5. Display Security Findings Table
+    # 7. Display Security Findings Table
     if findings:
         f_table = Table(
             title=f"Security Findings ({len(findings)})",
@@ -242,9 +364,9 @@ def analyze_command(
             header_style="bold red",
         )
         f_table.add_column("Severity", style="bold")
-        f_table.add_column("Rule ID", style="cyan")
+        f_table.add_column("Rule / Threat", style="cyan")
         f_table.add_column("Clusters", style="dim")
-        f_table.add_column("Description", style="white")
+        f_table.add_column("Assessment Summary", style="white")
 
         sev_colors = {
             "critical": "bold red",
@@ -254,24 +376,57 @@ def analyze_command(
             "info": "dim",
         }
 
-        # Build rule dictionary for descriptions
         rule_map = {r.id: r for r in loaded_rules}
 
         for f in findings:
-            r_id = f.rule_ids[0] if f.rule_ids else "custom"
+            r_id = f.rule_ids[0] if f.rule_ids else "ai-triage"
             r_obj = rule_map.get(r_id)
-            title = r_obj.title if r_obj else "Rule Match"
+            title = r_obj.title if r_obj else "AI Evaluated Cluster"
             color = sev_colors.get(f.rule_severity, "white")
+
+            summary_text = title
+            if f.llm:
+                summary_text = f"[bold]{f.llm.attack_type or 'anomaly'}:[/bold] {f.llm.summary}"
 
             f_table.add_row(
                 f"[{color}]{f.rule_severity.upper()}[/{color}]",
                 r_id,
                 ", ".join(f.cluster_ids[:2]),
-                title,
+                summary_text,
             )
         console.print(f_table)
 
-    # 6. Display Clusters
+    # 8. Display LLM Detail Panels if available
+    llm_findings = [f for f in findings if f.llm is not None]
+    if llm_findings:
+        console.print("\n[bold cyan]AI Triage Assessments & Recommendations[/bold cyan]")
+        for f in llm_findings[:5]:
+            assessment = f.llm
+            assert assessment is not None
+            details = [
+                f"[bold]Attack Type:[/bold] {assessment.attack_type or 'None'}",
+                f"[bold]Severity / Confidence:[/bold] {assessment.severity.upper()} ({assessment.confidence * 100:.0f}%)",
+                f"[bold]False Positive Likelihood:[/bold] {assessment.false_positive_likelihood}",
+                f"[bold]Summary:[/bold] {assessment.summary}",
+            ]
+            if assessment.evidence:
+                details.append("[bold]Evidence:[/bold]")
+                for ev in assessment.evidence:
+                    details.append(f"  • {ev}")
+            if assessment.recommended_actions:
+                details.append("[bold]Recommended Defensive Actions:[/bold]")
+                for act in assessment.recommended_actions:
+                    details.append(f"  ➜ {act}")
+
+            console.print(
+                Panel(
+                    "\n".join(details),
+                    title=f"Finding {f.id} (Cluster {', '.join(f.cluster_ids)})",
+                    border_style="cyan",
+                )
+            )
+
+    # 9. Display Clusters
     if clusters:
         c_table = Table(
             title=f"Mined Template Clusters ({len(clusters)})",
@@ -301,7 +456,83 @@ def analyze_command(
         f"Analyzed {parsed_count} events into {len(clusters)} clusters.\n"
         f"Evaluated {len(loaded_rules)} rules -> Detected {len(findings)} actionable security findings."
     )
+    if triage_stats:
+        status_message += (
+            f"\nLLM Calls: {triage_stats['llm_calls']} | Cache Hits: {triage_stats['cache_hits']} | "
+            f"Repairs: {triage_stats['repair_attempts']} | Injections: {triage_stats['injection_attempts_detected']}"
+        )
     console.print(Panel(status_message, title="Triage Complete", border_style="green"))
+
+
+# =========================================================================
+# Providers Subcommands
+# =========================================================================
+
+
+@providers_app.command(name="test")
+def providers_test_command(
+    provider: Annotated[
+        str,
+        typer.Option(
+            "--provider",
+            "-p",
+            help="LLM provider name to test (ollama, openai, gemini, anthropic, mock).",
+        ),
+    ] = "ollama",
+    model: Annotated[
+        str | None,
+        typer.Option(
+            "--model",
+            "-m",
+            help="Model name to verify.",
+        ),
+    ] = None,
+    base_url: Annotated[
+        str | None,
+        typer.Option(
+            "--base-url",
+            help="Custom endpoint URL for the provider.",
+        ),
+    ] = None,
+) -> None:
+    """Test connectivity and configuration for an LLM provider."""
+    console.print(f"Testing connectivity to LLM provider [bold cyan]{provider}[/bold cyan]...")
+
+    if provider == "mock":
+        console.print("[bold green]OK:[/bold green] Mock provider is operational (local/offline).")
+        return
+
+    try:
+        prov = get_provider(name=provider, model=model, base_url=base_url)
+    except Exception as e:
+        console.print(f"[bold red]Configuration Error:[/bold red] {e}")
+        raise typer.Exit(code=1) from e
+
+    test_fn = getattr(prov, "test_connection", None)
+    if callable(test_fn):
+        res = test_fn()
+        status = res.get("status", "unknown")
+        if status == "ok":
+            console.print(
+                f"[bold green]Connection Successful![/bold green] Provider [bold]{provider}[/bold] is ready."
+            )
+            for k, v in res.items():
+                if k != "status":
+                    console.print(f"  • {k}: {v}")
+        elif status == "warning":
+            console.print(
+                "[bold yellow]Warning:[/bold yellow] Provider endpoint reached, but model availability is unconfirmed."
+            )
+            for k, v in res.items():
+                if k != "status":
+                    console.print(f"  • {k}: {v}")
+        else:
+            console.print(
+                f"[bold red]Connection Failed:[/bold red] {res.get('error', 'Unknown error')}"
+            )
+            raise typer.Exit(code=1)
+    else:
+        console.print(f"[bold green]Provider loaded:[/bold green] {prov.name} is configured.")
 
 
 # =========================================================================
@@ -320,17 +551,21 @@ def rules_list_command(
         ),
     ] = None,
 ) -> None:
-    """List all available detection rules."""
+    """List all available detection rules with severity and MITRE ATT&CK tags."""
     rules = get_builtin_rules()
     if custom_dir:
-        rules.extend(load_rules_from_directory(Path(custom_dir)))
+        path = Path(custom_dir)
+        if not path.exists():
+            console.print(f"[bold red]Error:[/bold red] Directory not found: {custom_dir}")
+            raise typer.Exit(code=1)
+        rules.extend(load_rules_from_directory(path))
 
     table = Table(
-        title=f"Available Detection Rules ({len(rules)})",
+        title=f"Available Detection Rules ({len(rules)} total)",
         show_header=True,
         header_style="bold cyan",
     )
-    table.add_column("Rule ID", style="bold cyan")
+    table.add_column("Rule ID", style="cyan")
     table.add_column("Severity", style="bold")
     table.add_column("Source", style="dim")
     table.add_column("Title", style="white")
@@ -344,9 +579,9 @@ def rules_list_command(
         "info": "dim",
     }
 
-    for r in sorted(rules, key=lambda x: x.id):
+    for r in sorted(rules, key=lambda x: (x.severity, x.id)):
         color = sev_colors.get(r.severity, "white")
-        src = r.source if isinstance(r.source, str) else (",".join(r.source) if r.source else "*")
+        src = r.source if isinstance(r.source, str) else ", ".join(r.source or [])
         tags_str = ", ".join(r.tags[:2])
         table.add_row(
             r.id,

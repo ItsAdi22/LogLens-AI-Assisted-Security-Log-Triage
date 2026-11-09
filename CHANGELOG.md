@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Phase 3: Redaction & LLM Triage:
+  - Reversible token-based anonymization engine (`Redactor`) with levels `standard`, `strict`, and `off`.
+  - Comprehensive regex extractors for IPv4, IPv6, email addresses, JWT tokens, AWS access keys, Bearer tokens, URL credentials, query string secrets, and private keys.
+  - Multi-provider LLM abstraction (`LLMProvider` protocol) supporting Ollama, OpenAI-compatible APIs (OpenAI, OpenRouter, vLLM, LM Studio), Google Gemini, and Anthropic Claude.
+  - Deterministic `MockLLMProvider` for isolated, offline CI testing without network overhead.
+  - Guard module with ANSI code stripping, control character removal, tag breakout neutralization (`&lt;/log_data&gt;`), payload truncation, and suspicious prompt injection detection.
+  - Output extraction and validation against Pydantic `LLMAssessment` with single-repair retry prompts.
+  - Versioned prompt templates (`triage_v1.md`, `repair_v1.md`) enforcing SOC analyst persona and strict data containment boundaries.
+  - Persistent SQLite and in-memory triage caching (`LLMCache`) keyed by SHA-256 preventing redundant token charges.
+  - Token budget guardrails (`TokenBudget`) enforcing safety caps per run with automatic graceful fallback to rule findings.
+  - Cloud LLM privacy consent gate (`verify_cloud_consent`) requiring explicit acknowledgment before external data transfer.
+  - `loglens providers test` CLI command verifying provider connectivity.
+  - `loglens analyze` CLI enhancements: `--llm/--no-llm`, `--provider`, `--model`, `--base-url`, `--redaction`, `--dry-run-llm`, and `--agree-cloud-llm`.
+  - Full adversarial evaluation suite in `tests/eval/test_prompt_injection.py` testing injection resilience.
+  - Documentation: `docs/privacy-and-redaction.md` and `docs/llm-providers.md`.
 - Phase 2: Clustering & Rules Engine:
   - Drain3 template mining integration (`DrainClusterer`) with top extracted field tracking and sample collection.
   - Statistical anomaly detectors in `src/loglens/cluster/stats.py`: sliding-window entity bursts, rare template detection, and rate spikes via z-score.

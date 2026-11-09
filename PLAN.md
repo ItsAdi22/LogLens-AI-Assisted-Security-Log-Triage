@@ -459,15 +459,15 @@ A thin **vertical slice** (analyze auth.log → rules → LLM → markdown repor
 
 ### Phase 3 — Redaction & LLM Triage (6–8 days)
 
-- [ ] Redactor with reversible token map; unit tests for each pattern (IPv4/6, email, JWT, AWS-style keys, bearer, URL creds)
-- [ ] `LLMProvider` protocol; `ollama` provider first; then `openai_compat`, `gemini`, `anthropic`
-- [ ] Prompt template `triage_v1`; JSON schema enforcement; one repair retry; fallback to rule-only
-- [ ] Guard module: sanitization, truncation, delimiting, output validation
-- [ ] Cache layer, token budget, timeout/retry/circuit-breaker
-- [ ] Cloud-provider consent warning
-- [ ] `providers test` command
-- [ ] Adversarial/prompt-injection fixtures + tests
-- [ ] Mock provider for deterministic CI tests (no network in CI)
+- [x] Redactor with reversible token map; unit tests for each pattern (IPv4/6, email, JWT, AWS-style keys, bearer, URL creds)
+- [x] `LLMProvider` protocol; `ollama` provider first; then `openai_compat`, `gemini`, `anthropic`
+- [x] Prompt template `triage_v1`; JSON schema enforcement; one repair retry; fallback to rule-only
+- [x] Guard module: sanitization, truncation, delimiting, output validation
+- [x] Cache layer, token budget, timeout/retry/circuit-breaker
+- [x] Cloud-provider consent warning
+- [x] `providers test` command
+- [x] Adversarial/prompt-injection fixtures + tests
+- [x] Mock provider for deterministic CI tests (no network in CI)
 
 **DoD:** `loglens analyze sample_auth.log` with Ollama returns validated assessments; with LLM unreachable it still returns rule-based findings and exits cleanly; injection fixtures do not alter output schema or leak the system prompt.
 
