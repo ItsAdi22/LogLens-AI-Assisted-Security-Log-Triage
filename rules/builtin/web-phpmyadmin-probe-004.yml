@@ -1,0 +1,15 @@
+id: web-phpmyadmin-probe-004
+title: phpMyAdmin Administration Interface Probe
+description: Automated scan attempting to discover exposed phpMyAdmin or MySQL web consoles.
+source: web
+match:
+  field_regex:
+    path: "(phpmyadmin|pma|myadmin)"
+severity: low
+tags:
+  - attack.reconnaissance
+  - attack.t1595
+references:
+  - https://attack.mitre.org/techniques/T1595/
+false_positives:
+  - Administrator accessing self-hosted database console

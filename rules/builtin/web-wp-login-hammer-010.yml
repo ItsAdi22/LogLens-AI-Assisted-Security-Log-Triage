@@ -1,0 +1,19 @@
+id: web-wp-login-hammer-010
+title: WordPress Authentication Endpoint Hammering
+description: Rapid repeated requests targeted at wp-login.php or xmlrpc.php, indicating credential stuffing or brute force.
+source: web
+match:
+  field_regex:
+    path: "(wp-login\\.php|xmlrpc\\.php)"
+condition:
+  group_by: ip
+  count_gte: 5
+  window: 5m
+severity: high
+tags:
+  - attack.credential_access
+  - attack.t1110
+references:
+  - https://attack.mitre.org/techniques/T1110/
+false_positives:
+  - Administrator repeatedly attempting login after forgetting credentials

@@ -1,0 +1,18 @@
+id: generic-rate-burst-002
+title: High Volume Event Rate Burst from Single Source
+description: An abnormal burst of events generated from a single entity or host in a very narrow timeframe.
+match:
+  field_regex:
+    ip: ".+"
+condition:
+  group_by: ip
+  count_gte: 50
+  window: 2m
+severity: medium
+tags:
+  - attack.initial_access
+  - anomaly.burst
+references:
+  - https://attack.mitre.org/
+false_positives:
+  - High-traffic load testing or batch data synchronization

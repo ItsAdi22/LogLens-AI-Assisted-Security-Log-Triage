@@ -1,0 +1,16 @@
+id: ssh-root-login-003
+title: Direct SSH Root Login Attempt
+description: Direct authentication attempt against the privileged root account over SSH.
+source: sshd
+match:
+  field_matches:
+    user: root
+severity: low
+tags:
+  - attack.initial_access
+  - attack.t1078
+  - attack.t1078.003
+references:
+  - https://attack.mitre.org/techniques/T1078/003/
+false_positives:
+  - Legitimate direct root access on internal recovery networks

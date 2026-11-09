@@ -1,0 +1,16 @@
+id: web-path-traversal-001
+title: Web Directory Traversal / LFI Probe
+description: HTTP request containing directory traversal sequences (../) or references to sensitive system files.
+source: web
+match:
+  field_regex:
+    path: "(\\.\\./|/etc/passwd|win\\.ini|boot\\.ini)"
+severity: high
+tags:
+  - attack.initial_access
+  - attack.t1190
+references:
+  - https://attack.mitre.org/techniques/T1190/
+  - https://owasp.org/www-community/attacks/Path_Traversal
+false_positives:
+  - Security audit scans conducted by authorized internal teams

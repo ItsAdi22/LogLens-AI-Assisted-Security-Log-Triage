@@ -1,0 +1,18 @@
+id: generic-sudo-failed-001
+title: Sudo Privilege Escalation Authentication Failure
+description: Failed attempt by a local user to authenticate with sudo for elevated root privileges.
+source:
+  - auth
+  - sudo
+  - syslog
+match:
+  message_regex: "(sudo:.*authentication failure|sudo:.*incorrect password)"
+severity: high
+tags:
+  - attack.privilege_escalation
+  - attack.t1548
+  - attack.t1548.003
+references:
+  - https://attack.mitre.org/techniques/T1548/003/
+false_positives:
+  - Administrator mistyping their sudo password in terminal

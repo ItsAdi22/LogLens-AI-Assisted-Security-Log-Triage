@@ -1,0 +1,19 @@
+id: web-many-404s-008
+title: High Rate of HTTP 404 Not Found from Single Source
+description: An excessive volume of 404 responses returned to a single client IP, indicating active path or endpoint fuzzing.
+source: web
+match:
+  field_matches:
+    status: 404
+condition:
+  group_by: ip
+  count_gte: 10
+  window: 5m
+severity: medium
+tags:
+  - attack.discovery
+  - attack.t1083
+references:
+  - https://attack.mitre.org/techniques/T1083/
+false_positives:
+  - Broken web links or missing static assets generating 404s across users

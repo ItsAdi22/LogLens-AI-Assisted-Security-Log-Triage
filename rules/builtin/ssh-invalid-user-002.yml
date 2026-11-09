@@ -1,0 +1,20 @@
+id: ssh-invalid-user-002
+title: SSH Invalid Username Enumeration
+description: Repeated attempts to authenticate with non-existent usernames, indicating dictionary username enumeration.
+source: sshd
+match:
+  field_matches:
+    invalid_user: true
+condition:
+  group_by: ip
+  count_gte: 5
+  window: 5m
+severity: medium
+tags:
+  - attack.discovery
+  - attack.t1087
+  - attack.t1087.001
+references:
+  - https://attack.mitre.org/techniques/T1087/001/
+false_positives:
+  - User mistyping their username during initial account setup

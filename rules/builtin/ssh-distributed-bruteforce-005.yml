@@ -1,0 +1,19 @@
+id: ssh-distributed-bruteforce-005
+title: Distributed SSH Password Guessing Spike
+description: High global volume of failed SSH authentications across the host.
+source: sshd
+match:
+  field_matches:
+    action: failed_password
+condition:
+  count_gte: 30
+  window: 10m
+severity: high
+tags:
+  - attack.credential_access
+  - attack.t1110
+  - attack.t1110.003
+references:
+  - https://attack.mitre.org/techniques/T1110/003/
+false_positives:
+  - Fleet-wide configuration management rotation failure

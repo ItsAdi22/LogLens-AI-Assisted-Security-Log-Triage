@@ -1,0 +1,21 @@
+id: ssh-bruteforce-001
+title: SSH Brute Force from Single Source
+description: Multiple failed SSH login attempts detected from a single source IP in a short time window.
+source: sshd
+match:
+  template_regex: "Failed password for .* from"
+  field_matches:
+    action: failed_password
+condition:
+  group_by: ip
+  count_gte: 10
+  window: 5m
+severity: high
+tags:
+  - attack.credential_access
+  - attack.t1110
+  - attack.t1110.001
+references:
+  - https://attack.mitre.org/techniques/T1110/001/
+false_positives:
+  - Misconfigured automated deployment script with an expired password

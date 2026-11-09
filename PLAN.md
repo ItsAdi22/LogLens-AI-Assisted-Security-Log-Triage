@@ -446,14 +446,14 @@ A thin **vertical slice** (analyze auth.log → rules → LLM → markdown repor
 
 ### Phase 2 — Clustering & Rules (5–7 days)
 
-- [ ] Drain3 integration with persisted state (SQLite or file)
-- [ ] `Cluster` aggregation with top-field counters
-- [ ] Rule schema (pydantic) + loader + `rules validate`
-- [ ] Rule engine: template match, group_by, count/window, field conditions
-- [ ] Statistical detectors: spike, rarity, per-entity burst
-- [ ] Ship ≥ 15 built-in rules (SSH + web) with MITRE tags
-- [ ] `rules test` command against sample logs
-- [ ] Docs: `writing-rules.md`
+- [x] Drain3 integration with persisted state (SQLite or file)
+- [x] `Cluster` aggregation with top-field counters
+- [x] Rule schema (pydantic) + loader + `rules validate`
+- [x] Rule engine: template match, group_by, count/window, field conditions
+- [x] Statistical detectors: spike, rarity, per-entity burst
+- [x] Ship ≥ 15 built-in rules (SSH + web) with MITRE tags
+- [x] `rules test` command against sample logs
+- [x] Docs: `writing-rules.md`
 
 **DoD:** On synthetic attack logs, all built-in rules fire correctly with zero false positives on the clean baseline log.
 

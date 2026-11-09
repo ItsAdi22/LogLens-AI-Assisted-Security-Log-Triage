@@ -1,0 +1,16 @@
+id: web-xss-attempt-006
+title: Cross-Site Scripting (XSS) Probe
+description: HTTP request containing script tags or common cross-site scripting vector patterns.
+source: web
+match:
+  field_regex:
+    path: "(<script|%3Cscript|javascript:|onerror=|onload=)"
+severity: medium
+tags:
+  - attack.initial_access
+  - attack.t1190
+references:
+  - https://attack.mitre.org/techniques/T1190/
+  - https://owasp.org/www-community/attacks/xss/
+false_positives:
+  - Developer testing HTML sanitization endpoints

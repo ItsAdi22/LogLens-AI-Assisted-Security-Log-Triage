@@ -1,0 +1,16 @@
+id: web-scanner-ua-007
+title: Vulnerability Scanner User-Agent Detected
+description: HTTP request originating from a known automated reconnaissance tool (Nikto, sqlmap, gobuster, nmap).
+source: web
+match:
+  field_regex:
+    user_agent: "(nikto|sqlmap|gobuster|dirbuster|wpscan|nmap|masscan|acunetix)"
+severity: high
+tags:
+  - attack.reconnaissance
+  - attack.t1595
+  - attack.t1595.002
+references:
+  - https://attack.mitre.org/techniques/T1595/002/
+false_positives:
+  - Scheduled penetration testing scanner

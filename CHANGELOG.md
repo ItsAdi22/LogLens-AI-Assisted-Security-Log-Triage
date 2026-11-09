@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Phase 2: Clustering & Rules Engine:
+  - Drain3 template mining integration (`DrainClusterer`) with top extracted field tracking and sample collection.
+  - Statistical anomaly detectors in `src/loglens/cluster/stats.py`: sliding-window entity bursts, rare template detection, and rate spikes via z-score.
+  - IP and User-Agent threat intelligence enrichment (`src/loglens/enrich/`).
+  - Declarative YAML rule schema (`Rule`, `RuleMatch`, `RuleCondition`) with validation.
+  - Deterministic `RuleEngine` evaluating template patterns, field regexes, entity grouping, and time windows.
+  - 18 built-in detection rules mapped to MITRE ATT&CK techniques across SSH, Web, and System/Sudo domains.
+  - `loglens rules list`, `loglens rules validate`, and `loglens rules test` CLI commands.
+  - Integration of clustering and rules into `loglens analyze` displaying ranked findings and mined template clusters.
+  - Documentation guide: `docs/writing-rules.md`.
 - Phase 1: Ingestion & Parsing layer:
   - Streaming file reader with transparent gzip decompression (`FileReader`) and rotation-aware tailing (`TailReader`).
   - Stdin streaming reader (`StdinReader`).

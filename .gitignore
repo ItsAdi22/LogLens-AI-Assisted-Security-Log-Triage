@@ -48,6 +48,9 @@ Thumbs.db
 *.sqlite
 *.sqlite3
 
+# Graphify output
+graphify-out/
+
 # Local environment & secrets
 .env
 .env.local

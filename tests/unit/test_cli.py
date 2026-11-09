@@ -87,7 +87,7 @@ def test_cli_analyze_web_log(cli_runner: CliRunner, tmp_path: Path) -> None:
     )
     result = cli_runner.invoke(app, ["analyze", str(log_file), "-f", "web", "--no-llm"])
     assert result.exit_code == 0
-    assert "HTTP Status Distribution" in result.output
+    assert "Log Parsing Summary" in result.output
 
 
 def test_cli_analyze_stdin(cli_runner: CliRunner) -> None:
@@ -112,3 +112,86 @@ def test_cli_analyze_invalid_format(cli_runner: CliRunner, tmp_path: Path) -> No
     result = cli_runner.invoke(app, ["analyze", str(log_file), "--format", "nonexistent_format"])
     assert result.exit_code == 1
     assert "Unknown log format" in result.output
+
+
+def test_cli_rules_list(cli_runner: CliRunner) -> None:
+    """Verify `loglens rules list` displays registered rules."""
+    result = cli_runner.invoke(app, ["rules", "list"], env={"COLUMNS": "160"})
+    assert result.exit_code == 0
+    assert "Available Detection Rules" in result.output
+    assert "ssh-bruteforce-001" in result.output
+
+
+def test_cli_rules_validate_success(cli_runner: CliRunner, tmp_path: Path) -> None:
+    """Verify `loglens rules validate` succeeds on valid rule."""
+    rule_file = tmp_path / "test_rule.yml"
+    rule_file.write_text(
+        "id: test-rule-001\n"
+        "title: Test Rule\n"
+        "description: Testing\n"
+        "match:\n"
+        "  message_regex: 'test'\n"
+        "severity: high\n",
+        encoding="utf-8",
+    )
+    result = cli_runner.invoke(app, ["rules", "validate", str(rule_file)])
+    assert result.exit_code == 0
+    assert "Valid: Rule 'test-rule-001'" in result.output
+
+
+def test_cli_rules_validate_missing_file(cli_runner: CliRunner, tmp_path: Path) -> None:
+    """Verify `loglens rules validate` reports error on missing file."""
+    result = cli_runner.invoke(app, ["rules", "validate", str(tmp_path / "missing.yml")])
+    assert result.exit_code == 1
+    assert "File not found" in result.output
+
+
+def test_cli_rules_validate_invalid_syntax(cli_runner: CliRunner, tmp_path: Path) -> None:
+    """Verify `loglens rules validate` reports error on invalid schema."""
+    rule_file = tmp_path / "invalid_rule.yml"
+    rule_file.write_text("id: 'invalid rule id with spaces'\n", encoding="utf-8")
+    result = cli_runner.invoke(app, ["rules", "validate", str(rule_file)])
+    assert result.exit_code == 1
+    assert "Validation Error" in result.output
+
+
+def test_cli_rules_test_command(cli_runner: CliRunner, tmp_path: Path) -> None:
+    """Verify `loglens rules test` correctly evaluates a rule against a log."""
+    rule_file = tmp_path / "probe_rule.yml"
+    rule_file.write_text(
+        "id: probe-test-001\n"
+        "title: Probe Test\n"
+        "description: Testing probe\n"
+        "match:\n"
+        "  message_regex: 'malicious_probe'\n"
+        "severity: high\n",
+        encoding="utf-8",
+    )
+    log_file = tmp_path / "test.log"
+    log_file.write_text(
+        "2026-11-09 12:00:00 malicious_probe from 192.0.2.1\n2026-11-09 12:01:00 normal traffic\n",
+        encoding="utf-8",
+    )
+    result = cli_runner.invoke(app, ["rules", "test", str(rule_file), "--against", str(log_file)])
+    assert result.exit_code == 0
+    assert "RULE FIRED" in result.output
+    assert "probe-test-001" in result.output
+
+
+def test_cli_rules_test_no_match(cli_runner: CliRunner, tmp_path: Path) -> None:
+    """Verify `loglens rules test` reports when no events match."""
+    rule_file = tmp_path / "probe_rule.yml"
+    rule_file.write_text(
+        "id: probe-test-002\n"
+        "title: Probe Test\n"
+        "description: Testing probe\n"
+        "match:\n"
+        "  message_regex: 'never_appears'\n"
+        "severity: high\n",
+        encoding="utf-8",
+    )
+    log_file = tmp_path / "test.log"
+    log_file.write_text("2026-11-09 12:00:00 clean line\n", encoding="utf-8")
+    result = cli_runner.invoke(app, ["rules", "test", str(rule_file), "--against", str(log_file)])
+    assert result.exit_code == 0
+    assert "NO MATCH" in result.output

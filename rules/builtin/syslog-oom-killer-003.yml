@@ -1,0 +1,16 @@
+id: syslog-oom-killer-003
+title: Linux Kernel Out-Of-Memory (OOM) Killer Invoked
+description: System kernel invoked OOM-killer to terminate a process due to memory exhaustion.
+source:
+  - kernel
+  - syslog
+match:
+  message_regex: "(Out of memory: Kill process|oom-killer|invoked oom-killer)"
+severity: high
+tags:
+  - attack.impact
+  - attack.t1499
+references:
+  - https://attack.mitre.org/techniques/T1499/
+false_positives:
+  - Misconfigured memory limit on heavy computational jobs

@@ -1,0 +1,15 @@
+id: ssh-success-after-failure-004
+title: Successful SSH Authentication
+description: An SSH session was successfully authenticated and opened.
+source: sshd
+match:
+  field_matches:
+    action: accepted
+severity: info
+tags:
+  - attack.initial_access
+  - attack.t1078
+references:
+  - https://attack.mitre.org/techniques/T1078/
+false_positives:
+  - Routine administrative logins

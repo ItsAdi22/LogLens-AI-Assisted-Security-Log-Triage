@@ -1,0 +1,15 @@
+id: web-git-exposure-003
+title: Exposed Git Repository Probe
+description: HTTP request probing for exposed .git directory contents or configuration.
+source: web
+match:
+  field_regex:
+    path: "(^|/)\\.git/(config|HEAD|index)"
+severity: medium
+tags:
+  - attack.reconnaissance
+  - attack.t1592
+references:
+  - https://attack.mitre.org/techniques/T1592/
+false_positives:
+  - Benign web crawler indexing static directories

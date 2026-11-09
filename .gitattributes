@@ -1,0 +1,12 @@
+# Enforce consistent LF line endings across all platforms
+* text=auto eol=lf
+
+# Binary files
+*.gz binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+

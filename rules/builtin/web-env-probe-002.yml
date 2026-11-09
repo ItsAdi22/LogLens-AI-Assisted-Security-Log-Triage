@@ -1,0 +1,16 @@
+id: web-env-probe-002
+title: Sensitive Environment File (.env) Probe
+description: Direct HTTP probe attempting to access environment configuration or secret storage files (.env).
+source: web
+match:
+  field_regex:
+    path: "(^|/)\\.env($|\\?)"
+severity: high
+tags:
+  - attack.credential_access
+  - attack.t1552
+  - attack.t1552.001
+references:
+  - https://attack.mitre.org/techniques/T1552/001/
+false_positives:
+  - Vulnerability scanners authorized for posture assessments

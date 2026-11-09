@@ -1,0 +1,16 @@
+id: web-sqli-attempt-005
+title: SQL Injection Probe (SQLi)
+description: HTTP request containing common SQL injection signatures such as UNION SELECT or OR boolean bypass.
+source: web
+match:
+  field_regex:
+    path: "(UNION%20SELECT|UNION\\+SELECT|OR%201=1|OR\\+1=1|--|/\\*)"
+severity: critical
+tags:
+  - attack.initial_access
+  - attack.t1190
+references:
+  - https://attack.mitre.org/techniques/T1190/
+  - https://owasp.org/www-community/attacks/SQL_Injection
+false_positives:
+  - Web application firewall synthetic health check test strings
