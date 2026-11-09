@@ -1,0 +1,56 @@
+site_name: LogLens Documentation
+site_description: AI-Assisted Security Log Triage (Open Source)
+site_author: LogLens Contributors
+repo_url: https://github.com/ItsAdi22/LogLens-AI-Assisted-Security-Log-Triage
+repo_name: ItsAdi22/LogLens-AI-Assisted-Security-Log-Triage
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: cyan
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      primary: cyan
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+    - content.code.annotate
+
+nav:
+  - Overview: index.md
+  - Quickstart: quickstart.md
+  - Architecture: architecture.md
+  - Threat Model: threat-model.md
+  - Privacy & Redaction: privacy-and-redaction.md
+  - LLM Providers: llm-providers.md
+  - Detection Rules: writing-rules.md
+  - Benchmarks & Accuracy:
+      - Evaluation Quality: eval-results.md
+      - Performance Benchmarks: benchmarks.md
+  - Architecture Decisions (ADR):
+      - "0001: Initial Architecture": decisions/0001-initial-architecture.md
+  - Contributing: good-first-issues.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables

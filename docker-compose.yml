@@ -1,0 +1,26 @@
+services:
+  loglens:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: loglens
+    depends_on:
+      - ollama
+    environment:
+      - LOGLENS_OLLAMA_HOST=http://ollama:11434
+    volumes:
+      - ./examples:/logs:ro
+      - loglens_data:/config
+    command: ["analyze", "/logs/sample_auth.log", "--no-llm"]
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: loglens-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+
+volumes:
+  loglens_data:
+  ollama_models:

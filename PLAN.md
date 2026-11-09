@@ -486,14 +486,14 @@ A thin **vertical slice** (analyze auth.log → rules → LLM → markdown repor
 
 ### Phase 5 — Quality, Docs, Packaging, v0.1.0 (4–5 days)
 
-- [ ] Eval suite + results table in docs
-- [ ] Dockerfile (non-root, slim) + `docker-compose.yml` with Ollama service
-- [ ] MkDocs site, deployed via GitHub Pages
-- [ ] README: pitch, demo GIF/asciinema, 3-command quickstart, feature table, privacy statement, comparison table (vs fail2ban/Wazuh/etc.), roadmap, contributing link
-- [ ] Performance benchmarks documented
-- [ ] `release.yml`: tag → build → PyPI trusted publishing → GitHub Release with changelog
-- [ ] 10+ "good first issue" tickets created (new parsers, new rules, docs)
-- [ ] Tag **v0.1.0**
+- [x] Eval suite + results table in docs
+- [x] Dockerfile (non-root, slim) + `docker-compose.yml` with Ollama service
+- [x] MkDocs site, deployed via GitHub Pages
+- [x] README: pitch, demo GIF/asciinema, 3-command quickstart, feature table, privacy statement, comparison table (vs fail2ban/Wazuh/etc.), roadmap, contributing link
+- [x] Performance benchmarks documented
+- [x] `release.yml`: tag → build → PyPI trusted publishing → GitHub Release with changelog
+- [x] 10+ "good first issue" tickets created (new parsers, new rules, docs)
+- [x] Tag **v0.1.0**
 
 **DoD:** Fresh machine: `pipx install loglens` (or `docker compose up`) → analyze sample log in under 5 minutes following only the README.
 

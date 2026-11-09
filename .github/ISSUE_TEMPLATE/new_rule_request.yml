@@ -1,0 +1,47 @@
+name: New Detection Rule Request
+description: Propose a new built-in security detection rule for LogLens
+labels: ["rules", "detection-engineering"]
+body:
+  - type: input
+    id: rule_name
+    attributes:
+      label: Rule Title
+      description: Short descriptive name for the detection rule.
+      placeholder: e.g., SSH Direct Root Password Guessing
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Default Severity
+      options:
+        - critical
+        - high
+        - medium
+        - low
+        - info
+    validations:
+      required: true
+  - type: input
+    id: mitre_technique
+    attributes:
+      label: MITRE ATT&CK Technique ID
+      description: Technique or sub-technique identifier (e.g., T1110.001, T1190)
+      placeholder: e.g. T1110.001
+    validations:
+      required: false
+  - type: textarea
+    id: detection_logic
+    attributes:
+      label: Detection Logic & Conditions
+      description: Describe the matching logic, template wildcards, threshold counters, and time windows.
+      placeholder: "Triggers when 10+ failed password events for user root occur within a 60-second window from the same source IP."
+    validations:
+      required: true
+  - type: textarea
+    id: sample_logs
+    attributes:
+      label: Sample Log Lines
+      description: Provide 2-5 synthetic log lines that should match this detection rule. NEVER include real credentials or production secrets!
+    validations:
+      required: true

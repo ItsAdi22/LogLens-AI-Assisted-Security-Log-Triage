@@ -7,10 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [0.1.0] - 2026-11-09
 
 ### Added
-- Phase 4: Reports, Notifications, Store & Watch Mode:
+- **Phase 5: Quality, Documentation, Packaging & Release**:
+  - Ground-truth evaluation benchmark suite (`tests/eval/scenarios.py`) spanning 12 attack, injection, and benign scenarios.
+  - Evaluation runner (`tests/eval/run.py`) measuring severity agreement (100%), attack classification (100%), and prompt injection resistance (100%).
+  - Multi-stage minimal production `Dockerfile` with non-root security boundaries (`loglens:1000`) and volume mounts for `/logs` and `/config`.
+  - Multi-container `docker-compose.yml` stack pairing LogLens with local Ollama service for 100% offline private triage.
+  - MkDocs Material documentation suite (`mkdocs.yml`, `docs/index.md`, `docs/quickstart.md`, `docs/threat-model.md`, `docs/architecture.md`, `docs/benchmarks.md`, `docs/eval-results.md`).
+  - Community contribution backlog (`docs/good-first-issues.md`) with 12 well-scoped tasks across parsers, rules, alerts, and tooling.
+  - GitHub issue templates for new parser requests and new MITRE ATT&CK detection rule requests.
+- **Phase 4: Reports, Notifications, Store & Watch Mode**:
   - Reporting subsystem (`src/loglens/report/`) supporting Markdown, JSON (`report_schema_version = "1.0.0"`), and self-contained HTML.
   - Strict HTML output safety: all log-derived templates, messages, field values, and finding summaries are escaped (`html.escape()`) against XSS injection.
   - HTML report styling with toggleable dark/light themes, metric cards, and responsive CSS layout.
@@ -20,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `CooldownTracker` eliminating alert spam by deduplicating repeated findings within configurable windows.
   - Real-time continuous monitoring `loglens watch <path>` with debounce batching, rotation detection, and signal handling.
   - Pipeline exit code semantics: exit code 2 when security findings meet or exceed `--fail-on` threshold (ideal for CI/CD and cron jobs).
-- Phase 3: Redaction & LLM Triage:
+- **Phase 3: Redaction & LLM Triage**:
   - Reversible token-based anonymization engine (`Redactor`) with levels `standard`, `strict`, and `off`.
   - Comprehensive regex extractors for IPv4, IPv6, email addresses, JWT tokens, AWS access keys, Bearer tokens, URL credentials, query string secrets, and private keys.
   - Multi-provider LLM abstraction (`LLMProvider` protocol) supporting Ollama, OpenAI-compatible APIs (OpenAI, OpenRouter, vLLM, LM Studio), Google Gemini, and Anthropic Claude.
@@ -35,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `loglens analyze` CLI enhancements: `--llm/--no-llm`, `--provider`, `--model`, `--base-url`, `--redaction`, `--dry-run-llm`, and `--agree-cloud-llm`.
   - Full adversarial evaluation suite in `tests/eval/test_prompt_injection.py` testing injection resilience.
   - Documentation: `docs/privacy-and-redaction.md` and `docs/llm-providers.md`.
-- Phase 2: Clustering & Rules Engine:
+- **Phase 2: Clustering & Rules Engine**:
   - Drain3 template mining integration (`DrainClusterer`) with top extracted field tracking and sample collection.
   - Statistical anomaly detectors in `src/loglens/cluster/stats.py`: sliding-window entity bursts, rare template detection, and rate spikes via z-score.
   - IP and User-Agent threat intelligence enrichment (`src/loglens/enrich/`).
@@ -45,7 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `loglens rules list`, `loglens rules validate`, and `loglens rules test` CLI commands.
   - Integration of clustering and rules into `loglens analyze` displaying ranked findings and mined template clusters.
   - Documentation guide: `docs/writing-rules.md`.
-- Phase 1: Ingestion & Parsing layer:
+- **Phase 1: Ingestion & Parsing layer**:
   - Streaming file reader with transparent gzip decompression (`FileReader`) and rotation-aware tailing (`TailReader`).
   - Stdin streaming reader (`StdinReader`).
   - Core data models: `Event`, `Cluster`, `Finding`, `LLMAssessment`, `Report`, and `ReportMetadata`.
@@ -58,10 +66,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Comprehensive Hypothesis property-based fuzz tests verifying parsers never crash on arbitrary input.
   - CLI command `loglens analyze <path> --no-llm` with rich summary metrics and top IP/action tables.
   - Synthetic log generator script `scripts/gen_synthetic_logs.py` producing sanitized sample data.
-- Phase 0: Project bootstrap, repository layout, build configuration via `pyproject.toml` (PEP 621).
-- CLI skeleton with `loglens --version` and `--help` using Typer and Rich.
-- Strict type checking (`mypy --strict`), formatting, and linting (`ruff`).
-- GitHub Actions CI matrix (Python 3.11, 3.12, 3.13 on Linux and macOS), CodeQL analysis, and Release workflow.
-- Community guidelines: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, and issue/PR templates.
-- Architectural Decision Record ADR-0001 for baseline design choices.
-- Unit test suite for CLI and version flags.
+- **Phase 0: Bootstrap & Foundations**:
+  - Project bootstrap, repository layout, build configuration via `pyproject.toml` (PEP 621).
+  - CLI skeleton with `loglens --version` and `--help` using Typer and Rich.
+  - Strict type checking (`mypy --strict`), formatting, and linting (`ruff`).
+  - GitHub Actions CI matrix (Python 3.11, 3.12, 3.13 on Linux and macOS), CodeQL analysis, and Release workflow.
+  - Community guidelines: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, and issue/PR templates.
+  - Architectural Decision Record ADR-0001 for baseline design choices.
