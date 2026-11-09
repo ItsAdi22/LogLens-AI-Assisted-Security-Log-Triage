@@ -1,5 +1,8 @@
 """Unit tests for the LogLens CLI interface."""
 
+import runpy
+import sys
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -52,12 +55,60 @@ def test_main_function() -> None:
 
 def test_cli_module_main() -> None:
     """Verify executing loglens.cli as __main__ exits cleanly with --version."""
-    import runpy
-    import sys
-
     with (
         patch.object(sys, "argv", ["loglens", "--version"]),
         pytest.raises(SystemExit) as exc_info,
     ):
         runpy.run_module("loglens.cli", run_name="__main__")
     assert exc_info.value.code == 0
+
+
+def test_cli_analyze_command(cli_runner: CliRunner, tmp_path: Path) -> None:
+    """Verify `loglens analyze` successfully parses log files."""
+    log_file = tmp_path / "auth.log"
+    log_file.write_text(
+        "Nov 09 14:02:11 web01 sshd[1234]: Failed password for root from 192.0.2.15 port 44212 ssh2\n"
+        "Nov 09 14:05:00 web01 sshd[1235]: Accepted publickey for ubuntu from 192.0.2.50 port 51234 ssh2: RSA\n",
+        encoding="utf-8",
+    )
+    result = cli_runner.invoke(app, ["analyze", str(log_file), "--no-llm"])
+    assert result.exit_code == 0
+    assert "Log Parsing Summary" in result.output
+    assert "Parsed Events" in result.output
+    assert "192.0.2.15" in result.output
+
+
+def test_cli_analyze_web_log(cli_runner: CliRunner, tmp_path: Path) -> None:
+    """Verify `loglens analyze` with web format."""
+    log_file = tmp_path / "access.log"
+    log_file.write_text(
+        '192.0.2.10 - - [09/Nov/2026:14:30:00 +0000] "GET /index.html HTTP/1.1" 200 1024 "-" "curl"\n',
+        encoding="utf-8",
+    )
+    result = cli_runner.invoke(app, ["analyze", str(log_file), "-f", "web", "--no-llm"])
+    assert result.exit_code == 0
+    assert "HTTP Status Distribution" in result.output
+
+
+def test_cli_analyze_stdin(cli_runner: CliRunner) -> None:
+    """Verify `loglens analyze -` reads from stdin."""
+    sample_input = "2026-11-09 12:00:00 Warning: host down\n"
+    result = cli_runner.invoke(app, ["analyze", "-", "--no-llm"], input=sample_input)
+    assert result.exit_code == 0
+    assert "Log Parsing Summary" in result.output
+
+
+def test_cli_analyze_missing_file(cli_runner: CliRunner, tmp_path: Path) -> None:
+    """Verify `loglens analyze` reports error when file is missing."""
+    result = cli_runner.invoke(app, ["analyze", str(tmp_path / "nonexistent.log")])
+    assert result.exit_code == 1
+    assert "Log file not found" in result.output
+
+
+def test_cli_analyze_invalid_format(cli_runner: CliRunner, tmp_path: Path) -> None:
+    """Verify `loglens analyze` reports error on unknown format."""
+    log_file = tmp_path / "test.log"
+    log_file.write_text("some log\n", encoding="utf-8")
+    result = cli_runner.invoke(app, ["analyze", str(log_file), "--format", "nonexistent_format"])
+    assert result.exit_code == 1
+    assert "Unknown log format" in result.output

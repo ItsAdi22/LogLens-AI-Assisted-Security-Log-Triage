@@ -434,13 +434,13 @@ A thin **vertical slice** (analyze auth.log → rules → LLM → markdown repor
 
 ### Phase 1 — Ingestion & Parsing (4–6 days)
 
-- [ ] `Event` model + tests
-- [ ] File reader (gzip support), stdin reader, rotation-aware tail
-- [ ] Parser protocol, registry, **format autodetect** (sample first 50 lines)
-- [ ] Parsers: sshd/auth.log (failed/accepted/invalid user/sudo), nginx/apache/OpenLiteSpeed combined access log, generic syslog, JSON lines, fallback generic
-- [ ] Timezone/year handling for syslog timestamps (no year in format!)
-- [ ] Hypothesis fuzz tests: parsers never crash on garbage; malformed lines counted, not fatal
-- [ ] Synthetic log generator script (`scripts/gen_synthetic_logs.py`)
+- [x] `Event` model + tests
+- [x] File reader (gzip support), stdin reader, rotation-aware tail
+- [x] Parser protocol, registry, **format autodetect** (sample first 50 lines)
+- [x] Parsers: sshd/auth.log (failed/accepted/invalid user/sudo), nginx/apache/OpenLiteSpeed combined access log, generic syslog, JSON lines, fallback generic
+- [x] Timezone/year handling for syslog timestamps (no year in format!)
+- [x] Hypothesis fuzz tests: parsers never crash on garbage; malformed lines counted, not fatal
+- [x] Synthetic log generator script (`scripts/gen_synthetic_logs.py`)
 
 **DoD:** `loglens analyze examples/sample_auth.log --no-llm` prints parsed event counts; parser coverage ≥ 90%; 1M-line file parses in a reasonable time with bounded memory (streaming).
 

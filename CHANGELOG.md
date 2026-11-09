@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Phase 1: Ingestion & Parsing layer:
+  - Streaming file reader with transparent gzip decompression (`FileReader`) and rotation-aware tailing (`TailReader`).
+  - Stdin streaming reader (`StdinReader`).
+  - Core data models: `Event`, `Cluster`, `Finding`, `LLMAssessment`, `Report`, and `ReportMetadata`.
+  - Parsers with autodetect:
+    - `AuthLogParser`: sshd, sudo, PAM, su with legacy and ISO 8601 timestamp support and year rollover handling.
+    - `WebAccessParser`: Nginx, Apache, OpenLiteSpeed Common and Combined Log Formats with vhost support.
+    - `SyslogParser`: RFC 3164 (BSD) and RFC 5424 (IETF) syslog streams.
+    - `JsonLinesParser`: structured JSON logs with automatic timestamp and severity resolution.
+    - `GenericParser`: resilient fallback line parser.
+  - Comprehensive Hypothesis property-based fuzz tests verifying parsers never crash on arbitrary input.
+  - CLI command `loglens analyze <path> --no-llm` with rich summary metrics and top IP/action tables.
+  - Synthetic log generator script `scripts/gen_synthetic_logs.py` producing sanitized sample data.
 - Phase 0: Project bootstrap, repository layout, build configuration via `pyproject.toml` (PEP 621).
 - CLI skeleton with `loglens --version` and `--help` using Typer and Rich.
 - Strict type checking (`mypy --strict`), formatting, and linting (`ruff`).

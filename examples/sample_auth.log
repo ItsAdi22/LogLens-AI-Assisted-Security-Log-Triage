@@ -1,0 +1,110 @@
+Nov 09 13:25:58 prod-srv-01 sshd[1727]: Accepted publickey for deploy from 192.0.2.51 port 36260 ssh2: RSA SHA256:synthKeyExample
+Nov 09 13:30:58 prod-srv-01 sshd[8447]: Accepted publickey for ubuntu from 203.0.113.88 port 32031 ssh2: RSA SHA256:synthKeyExample
+Nov 09 13:35:58 prod-srv-01 sshd[8007]: Accepted publickey for deploy from 192.0.2.51 port 47036 ssh2: RSA SHA256:synthKeyExample
+Nov 09 13:40:58 prod-srv-01 sshd[9689]: Accepted publickey for ubuntu from 203.0.113.88 port 45325 ssh2: RSA SHA256:synthKeyExample
+Nov 09 13:45:58 prod-srv-01 sshd[2454]: Accepted publickey for ubuntu from 203.0.113.88 port 49247 ssh2: RSA SHA256:synthKeyExample
+Nov 09 13:50:58 prod-srv-01 sshd[7307]: Accepted publickey for ubuntu from 203.0.113.88 port 32337 ssh2: RSA SHA256:synthKeyExample
+Nov 09 13:55:58 prod-srv-01 sshd[8351]: Accepted publickey for ubuntu from 192.0.2.51 port 40805 ssh2: RSA SHA256:synthKeyExample
+Nov 09 14:00:58 prod-srv-01 sshd[5308]: Accepted publickey for deploy from 192.0.2.51 port 30900 ssh2: RSA SHA256:synthKeyExample
+Nov 09 14:05:58 prod-srv-01 sshd[8468]: Accepted publickey for ubuntu from 192.0.2.51 port 56048 ssh2: RSA SHA256:synthKeyExample
+Nov 09 14:10:58 prod-srv-01 sshd[2222]: Accepted publickey for ubuntu from 203.0.113.88 port 56911 ssh2: RSA SHA256:synthKeyExample
+Nov 09 14:15:58 prod-srv-01 sshd[4725]: Accepted publickey for deploy from 192.0.2.51 port 53157 ssh2: RSA SHA256:synthKeyExample
+Nov 09 14:20:58 prod-srv-01 sshd[3075]: Accepted publickey for deploy from 203.0.113.88 port 41073 ssh2: RSA SHA256:synthKeyExample
+Nov 09 14:25:58 prod-srv-01 sshd[7223]: Accepted publickey for deploy from 203.0.113.88 port 48959 ssh2: RSA SHA256:synthKeyExample
+Nov 09 14:30:58 prod-srv-01 sshd[9196]: Accepted publickey for deploy from 192.0.2.50 port 43794 ssh2: RSA SHA256:synthKeyExample
+Nov 09 14:35:58 prod-srv-01 sshd[5593]: Accepted publickey for deploy from 192.0.2.51 port 38997 ssh2: RSA SHA256:synthKeyExample
+Nov 09 14:40:58 prod-srv-01 sshd[6237]: Accepted publickey for deploy from 192.0.2.50 port 49027 ssh2: RSA SHA256:synthKeyExample
+Nov 09 14:45:58 prod-srv-01 sshd[8801]: Accepted publickey for ubuntu from 203.0.113.88 port 30407 ssh2: RSA SHA256:synthKeyExample
+Nov 09 14:50:58 prod-srv-01 sshd[6134]: Accepted publickey for ubuntu from 192.0.2.50 port 56889 ssh2: RSA SHA256:synthKeyExample
+Nov 09 14:55:58 prod-srv-01 sshd[2747]: Accepted publickey for deploy from 192.0.2.51 port 57240 ssh2: RSA SHA256:synthKeyExample
+Nov 09 15:00:58 prod-srv-01 sshd[1809]: Accepted publickey for deploy from 192.0.2.51 port 40682 ssh2: RSA SHA256:synthKeyExample
+Nov 09 14:25:58 prod-srv-01 sshd[7682]: Failed password for guest from 192.0.2.10 port 31385 ssh2
+Nov 09 14:26:00 prod-srv-01 sshd[8346]: Failed password for invalid user test from 192.0.2.10 port 40858 ssh2
+Nov 09 14:26:02 prod-srv-01 sshd[3151]: Failed password for deploy from 192.0.2.10 port 32034 ssh2
+Nov 09 14:26:04 prod-srv-01 sshd[4879]: Failed password for invalid user admin from 192.0.2.10 port 31645 ssh2
+Nov 09 14:26:06 prod-srv-01 sshd[7170]: Failed password for root from 192.0.2.10 port 50783 ssh2
+Nov 09 14:26:08 prod-srv-01 sshd[9571]: Failed password for invalid user guest from 192.0.2.10 port 58096 ssh2
+Nov 09 14:26:10 prod-srv-01 sshd[1315]: Failed password for invalid user guest from 192.0.2.10 port 46579 ssh2
+Nov 09 14:26:12 prod-srv-01 sshd[9893]: Failed password for guest from 192.0.2.10 port 51492 ssh2
+Nov 09 14:26:14 prod-srv-01 sshd[4467]: Failed password for invalid user ubuntu from 192.0.2.10 port 50422 ssh2
+Nov 09 14:26:16 prod-srv-01 sshd[8359]: Failed password for test from 192.0.2.10 port 35064 ssh2
+Nov 09 14:26:18 prod-srv-01 sshd[1239]: Failed password for root from 192.0.2.10 port 41797 ssh2
+Nov 09 14:26:20 prod-srv-01 sshd[2571]: Failed password for invalid user deploy from 192.0.2.10 port 57401 ssh2
+Nov 09 14:26:22 prod-srv-01 sshd[3073]: Failed password for ubuntu from 192.0.2.10 port 34113 ssh2
+Nov 09 14:26:24 prod-srv-01 sshd[3948]: Failed password for invalid user root from 192.0.2.10 port 36389 ssh2
+Nov 09 14:26:26 prod-srv-01 sshd[6182]: Failed password for deploy from 192.0.2.10 port 40598 ssh2
+Nov 09 14:26:28 prod-srv-01 sshd[7555]: Failed password for test from 192.0.2.10 port 56510 ssh2
+Nov 09 14:26:30 prod-srv-01 sshd[9624]: Failed password for guest from 192.0.2.10 port 48728 ssh2
+Nov 09 14:26:32 prod-srv-01 sshd[6545]: Failed password for deploy from 192.0.2.10 port 38313 ssh2
+Nov 09 14:26:34 prod-srv-01 sshd[4142]: Failed password for invalid user deploy from 192.0.2.10 port 56490 ssh2
+Nov 09 14:26:36 prod-srv-01 sshd[4905]: Failed password for deploy from 192.0.2.10 port 32313 ssh2
+Nov 09 14:26:38 prod-srv-01 sshd[7725]: Failed password for test from 192.0.2.10 port 51870 ssh2
+Nov 09 14:26:40 prod-srv-01 sshd[2448]: Failed password for invalid user guest from 192.0.2.10 port 35753 ssh2
+Nov 09 14:26:42 prod-srv-01 sshd[1517]: Failed password for invalid user root from 192.0.2.10 port 53298 ssh2
+Nov 09 14:26:44 prod-srv-01 sshd[1775]: Failed password for guest from 192.0.2.10 port 36616 ssh2
+Nov 09 14:26:46 prod-srv-01 sshd[3945]: Failed password for invalid user deploy from 192.0.2.10 port 51026 ssh2
+Nov 09 14:26:48 prod-srv-01 sshd[6393]: Failed password for ubuntu from 192.0.2.10 port 58415 ssh2
+Nov 09 14:26:50 prod-srv-01 sshd[4526]: Failed password for invalid user test from 192.0.2.10 port 36054 ssh2
+Nov 09 14:26:52 prod-srv-01 sshd[8449]: Failed password for invalid user root from 192.0.2.10 port 34967 ssh2
+Nov 09 14:26:54 prod-srv-01 sshd[6995]: Failed password for invalid user test from 192.0.2.10 port 48041 ssh2
+Nov 09 14:26:56 prod-srv-01 sshd[9745]: Failed password for invalid user test from 192.0.2.10 port 54811 ssh2
+Nov 09 14:26:58 prod-srv-01 sshd[7903]: Failed password for invalid user test from 192.0.2.10 port 33090 ssh2
+Nov 09 14:27:00 prod-srv-01 sshd[7868]: Failed password for admin from 192.0.2.10 port 33849 ssh2
+Nov 09 14:27:02 prod-srv-01 sshd[9059]: Failed password for root from 192.0.2.10 port 41472 ssh2
+Nov 09 14:27:04 prod-srv-01 sshd[8742]: Failed password for ubuntu from 192.0.2.10 port 32488 ssh2
+Nov 09 14:27:06 prod-srv-01 sshd[9040]: Failed password for guest from 192.0.2.10 port 47411 ssh2
+Nov 09 14:27:08 prod-srv-01 sshd[3331]: Failed password for invalid user guest from 192.0.2.10 port 44752 ssh2
+Nov 09 14:27:10 prod-srv-01 sshd[8121]: Failed password for root from 192.0.2.10 port 56155 ssh2
+Nov 09 14:27:12 prod-srv-01 sshd[1998]: Failed password for admin from 192.0.2.10 port 59829 ssh2
+Nov 09 14:27:14 prod-srv-01 sshd[5016]: Failed password for invalid user guest from 192.0.2.10 port 43659 ssh2
+Nov 09 14:27:16 prod-srv-01 sshd[8561]: Failed password for admin from 192.0.2.10 port 57343 ssh2
+Nov 09 14:27:18 prod-srv-01 sshd[7145]: Failed password for test from 192.0.2.10 port 45531 ssh2
+Nov 09 14:27:20 prod-srv-01 sshd[5645]: Failed password for invalid user root from 192.0.2.10 port 46114 ssh2
+Nov 09 14:27:22 prod-srv-01 sshd[7959]: Failed password for ubuntu from 192.0.2.10 port 44564 ssh2
+Nov 09 14:27:24 prod-srv-01 sshd[6892]: Failed password for deploy from 192.0.2.10 port 45233 ssh2
+Nov 09 14:27:26 prod-srv-01 sshd[3039]: Failed password for invalid user admin from 192.0.2.10 port 36617 ssh2
+Nov 09 14:27:28 prod-srv-01 sshd[3789]: Failed password for invalid user ubuntu from 192.0.2.10 port 34502 ssh2
+Nov 09 14:27:30 prod-srv-01 sshd[3538]: Failed password for invalid user admin from 192.0.2.10 port 58629 ssh2
+Nov 09 14:27:32 prod-srv-01 sshd[9637]: Failed password for invalid user guest from 192.0.2.10 port 32051 ssh2
+Nov 09 14:27:34 prod-srv-01 sshd[6131]: Failed password for invalid user deploy from 192.0.2.10 port 37559 ssh2
+Nov 09 14:27:36 prod-srv-01 sshd[6843]: Failed password for root from 192.0.2.10 port 34712 ssh2
+Nov 09 14:27:38 prod-srv-01 sshd[3533]: Failed password for invalid user admin from 192.0.2.10 port 52466 ssh2
+Nov 09 14:27:40 prod-srv-01 sshd[4735]: Failed password for ubuntu from 192.0.2.10 port 42750 ssh2
+Nov 09 14:27:42 prod-srv-01 sshd[6548]: Failed password for invalid user ubuntu from 192.0.2.10 port 56266 ssh2
+Nov 09 14:27:44 prod-srv-01 sshd[9191]: Failed password for invalid user ubuntu from 192.0.2.10 port 45509 ssh2
+Nov 09 14:27:46 prod-srv-01 sshd[9087]: Failed password for invalid user test from 192.0.2.10 port 51728 ssh2
+Nov 09 14:27:48 prod-srv-01 sshd[7261]: Failed password for root from 192.0.2.10 port 32534 ssh2
+Nov 09 14:27:50 prod-srv-01 sshd[3263]: Failed password for root from 192.0.2.10 port 48827 ssh2
+Nov 09 14:27:52 prod-srv-01 sshd[3813]: Failed password for invalid user guest from 192.0.2.10 port 57423 ssh2
+Nov 09 14:27:54 prod-srv-01 sshd[8343]: Failed password for test from 192.0.2.10 port 59644 ssh2
+Nov 09 14:27:56 prod-srv-01 sshd[4104]: Failed password for invalid user ubuntu from 192.0.2.10 port 35699 ssh2
+Nov 09 14:27:58 prod-srv-01 sshd[8836]: Failed password for deploy from 192.0.2.10 port 58629 ssh2
+Nov 09 14:28:00 prod-srv-01 sshd[9932]: Failed password for invalid user admin from 192.0.2.10 port 50790 ssh2
+Nov 09 14:28:02 prod-srv-01 sshd[8402]: Failed password for deploy from 192.0.2.10 port 36254 ssh2
+Nov 09 14:28:04 prod-srv-01 sshd[9870]: Failed password for invalid user test from 192.0.2.10 port 49659 ssh2
+Nov 09 14:28:06 prod-srv-01 sshd[5961]: Failed password for admin from 192.0.2.10 port 51334 ssh2
+Nov 09 14:28:08 prod-srv-01 sshd[8580]: Failed password for invalid user ubuntu from 192.0.2.10 port 46090 ssh2
+Nov 09 14:28:10 prod-srv-01 sshd[1531]: Failed password for guest from 192.0.2.10 port 32681 ssh2
+Nov 09 14:28:12 prod-srv-01 sshd[4474]: Failed password for invalid user guest from 192.0.2.10 port 44485 ssh2
+Nov 09 14:28:14 prod-srv-01 sshd[7154]: Failed password for ubuntu from 192.0.2.10 port 56788 ssh2
+Nov 09 14:28:16 prod-srv-01 sshd[3396]: Failed password for invalid user root from 192.0.2.10 port 40376 ssh2
+Nov 09 14:28:18 prod-srv-01 sshd[9393]: Failed password for invalid user admin from 192.0.2.10 port 30776 ssh2
+Nov 09 14:28:20 prod-srv-01 sshd[7574]: Failed password for test from 192.0.2.10 port 33721 ssh2
+Nov 09 14:28:22 prod-srv-01 sshd[1027]: Failed password for ubuntu from 192.0.2.10 port 40577 ssh2
+Nov 09 14:28:24 prod-srv-01 sshd[8967]: Failed password for root from 192.0.2.10 port 33428 ssh2
+Nov 09 14:28:26 prod-srv-01 sshd[9785]: Failed password for invalid user guest from 192.0.2.10 port 39022 ssh2
+Nov 09 14:28:28 prod-srv-01 sshd[2958]: Failed password for invalid user test from 192.0.2.10 port 30042 ssh2
+Nov 09 14:28:30 prod-srv-01 sshd[8758]: Failed password for ubuntu from 192.0.2.10 port 32063 ssh2
+Nov 09 14:28:32 prod-srv-01 sshd[4938]: Failed password for admin from 192.0.2.10 port 33160 ssh2
+Nov 09 14:28:34 prod-srv-01 sshd[1367]: Failed password for test from 192.0.2.10 port 38233 ssh2
+Nov 09 14:28:36 prod-srv-01 sshd[6083]: Failed password for test from 192.0.2.10 port 37721 ssh2
+Nov 09 13:25:58 prod-srv-01 sudo:   ubuntu : TTY=pts/0 ; PWD=/home/ubuntu ; USER=root ; COMMAND=/usr/bin/systemctl restart nginx
+Nov 09 13:35:58 prod-srv-01 sudo:   ubuntu : TTY=pts/0 ; PWD=/home/ubuntu ; USER=root ; COMMAND=/usr/bin/systemctl restart nginx
+Nov 09 13:45:58 prod-srv-01 sudo:   ubuntu : TTY=pts/0 ; PWD=/home/ubuntu ; USER=root ; COMMAND=/usr/bin/systemctl restart nginx
+Nov 09 13:55:58 prod-srv-01 sudo:   ubuntu : TTY=pts/0 ; PWD=/home/ubuntu ; USER=root ; COMMAND=/usr/bin/systemctl restart nginx
+Nov 09 14:05:58 prod-srv-01 sudo:   ubuntu : TTY=pts/0 ; PWD=/home/ubuntu ; USER=root ; COMMAND=/usr/bin/systemctl restart nginx
+Nov 09 14:15:58 prod-srv-01 sudo:   ubuntu : TTY=pts/0 ; PWD=/home/ubuntu ; USER=root ; COMMAND=/usr/bin/systemctl restart nginx
+Nov 09 14:25:58 prod-srv-01 sudo:   ubuntu : TTY=pts/0 ; PWD=/home/ubuntu ; USER=root ; COMMAND=/usr/bin/systemctl restart nginx
+Nov 09 14:35:58 prod-srv-01 sudo:   ubuntu : TTY=pts/0 ; PWD=/home/ubuntu ; USER=root ; COMMAND=/usr/bin/systemctl restart nginx
+Nov 09 14:45:58 prod-srv-01 sudo:   ubuntu : TTY=pts/0 ; PWD=/home/ubuntu ; USER=root ; COMMAND=/usr/bin/systemctl restart nginx
+Nov 09 14:55:58 prod-srv-01 sudo:   ubuntu : TTY=pts/0 ; PWD=/home/ubuntu ; USER=root ; COMMAND=/usr/bin/systemctl restart nginx

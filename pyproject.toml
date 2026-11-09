@@ -83,7 +83,9 @@ select = [
     "SIM",  # flake8-simplify
     "RUF",  # ruff-specific rules
 ]
-ignore = []
+ignore = [
+    "E501", # line too long (handled by formatter / sample logs)
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["loglens"]
