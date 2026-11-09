@@ -82,3 +82,4 @@ loglens rules test my-custom-rule.yml --against examples/sample_auth.log
 # 3. List all registered built-in and custom rules
 loglens rules list
 ```
+

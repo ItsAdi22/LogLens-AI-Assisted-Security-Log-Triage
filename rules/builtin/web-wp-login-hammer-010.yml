@@ -17,3 +17,4 @@ references:
   - https://attack.mitre.org/techniques/T1110/
 false_positives:
   - Administrator repeatedly attempting login after forgetting credentials
+

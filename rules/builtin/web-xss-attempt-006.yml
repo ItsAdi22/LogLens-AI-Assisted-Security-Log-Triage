@@ -14,3 +14,4 @@ references:
   - https://owasp.org/www-community/attacks/xss/
 false_positives:
   - Developer testing HTML sanitization endpoints
+

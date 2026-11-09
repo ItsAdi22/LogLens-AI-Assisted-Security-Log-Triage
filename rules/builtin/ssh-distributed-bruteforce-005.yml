@@ -17,3 +17,4 @@ references:
   - https://attack.mitre.org/techniques/T1110/003/
 false_positives:
   - Fleet-wide configuration management rotation failure
+

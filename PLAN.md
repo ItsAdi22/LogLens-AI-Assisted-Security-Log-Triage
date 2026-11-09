@@ -473,14 +473,14 @@ A thin **vertical slice** (analyze auth.log → rules → LLM → markdown repor
 
 ### Phase 4 — Reports, Notifications, Store, Watch (4–5 days)
 
-- [ ] Markdown report (executive summary → findings by severity → evidence → recommended actions → appendix of stats)
-- [ ] JSON report (stable, versioned schema `report_schema_version`)
-- [ ] HTML report (self-contained, escaped, dark/light)
-- [ ] SQLite store: runs, clusters, findings, cache; migrations
-- [ ] Notifiers: Telegram, Discord, generic webhook; severity threshold + dedupe/cooldown
-- [ ] `watch` mode: incremental processing, debounce, graceful shutdown
-- [ ] `report --since` from stored history
-- [ ] Exit-code semantics
+- [x] Markdown report (executive summary → findings by severity → evidence → recommended actions → appendix of stats)
+- [x] JSON report (stable, versioned schema `report_schema_version`)
+- [x] HTML report (self-contained, escaped, dark/light)
+- [x] SQLite store: runs, clusters, findings, cache; migrations
+- [x] Notifiers: Telegram, Discord, generic webhook; severity threshold + dedupe/cooldown
+- [x] `watch` mode: incremental processing, debounce, graceful shutdown
+- [x] `report --since` from stored history
+- [x] Exit-code semantics
 
 **DoD:** Daily digest runs from cron, sends one Telegram message, and doesn't repeat identical alerts within cooldown.
 

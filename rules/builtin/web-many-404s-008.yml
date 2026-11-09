@@ -17,3 +17,4 @@ references:
   - https://attack.mitre.org/techniques/T1083/
 false_positives:
   - Broken web links or missing static assets generating 404s across users
+

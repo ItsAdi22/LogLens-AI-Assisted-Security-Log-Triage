@@ -16,3 +16,4 @@ references:
   - https://attack.mitre.org/techniques/T1548/003/
 false_positives:
   - Administrator mistyping their sudo password in terminal
+

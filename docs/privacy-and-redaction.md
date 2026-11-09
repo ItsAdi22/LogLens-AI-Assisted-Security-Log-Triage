@@ -51,3 +51,4 @@ LogLens guarantees that no data is transmitted to an external cloud provider (Op
 - If an interactive terminal is detected, LogLens displays a privacy disclosure and requests confirmation.
 - In automated scripts or CI/CD pipelines, pass `--agree-cloud-llm` or set `LOGLENS_AGREE_CLOUD_LLM=1` to acknowledge and permit cloud transmission.
 - Local providers (Ollama, local vLLM, mock) do not require cloud consent.
+

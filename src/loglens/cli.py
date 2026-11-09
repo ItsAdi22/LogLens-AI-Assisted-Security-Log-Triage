@@ -1,6 +1,7 @@
 """Command Line Interface for LogLens."""
 
 from collections import Counter
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Annotated
 
@@ -21,15 +22,23 @@ from loglens.llm import (
 )
 from loglens.llm.consent import verify_cloud_consent
 from loglens.llm.prompts.loader import format_cluster_for_llm
-from loglens.models import Event, Finding
+from loglens.models import Event, Finding, Report, ReportMetadata
+from loglens.notify import get_notifier
 from loglens.parsers import Parser, registry
 from loglens.redact import Redactor
+from loglens.report import (
+    generate_html_report,
+    generate_json_report,
+    generate_markdown_report,
+)
 from loglens.rules import (
     RuleEngine,
     get_builtin_rules,
     load_rule_from_file,
     load_rules_from_directory,
 )
+from loglens.store import StorageManager
+from loglens.watch import WatchMonitor
 
 app = typer.Typer(
     name="loglens",
@@ -58,6 +67,23 @@ def version_callback(value: bool) -> None:
     if value:
         console.print(f"LogLens [bold cyan]v{__version__}[/bold cyan]")
         raise typer.Exit()
+
+
+def parse_since_duration(val: str) -> datetime:
+    """Parse relative duration string (e.g. 24h, 7d, 30m) or ISO datetime."""
+    val = val.strip().lower()
+    now = datetime.now(UTC)
+    if val.endswith("h"):
+        return now - timedelta(hours=float(val[:-1]))
+    if val.endswith("d"):
+        return now - timedelta(days=float(val[:-1]))
+    if val.endswith("m"):
+        return now - timedelta(minutes=float(val[:-1]))
+    try:
+        dt = datetime.fromisoformat(val)
+        return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
+    except ValueError:
+        return now - timedelta(hours=24)
 
 
 @app.callback()
@@ -148,12 +174,19 @@ def analyze_command(
             help="Consent to sending anonymized cluster data to cloud LLM providers.",
         ),
     ] = False,
+    fail_on: Annotated[
+        str,
+        typer.Option(
+            "--fail-on",
+            help="Exit with code 2 if findings equal or exceed severity (critical, high, medium, low, none).",
+        ),
+    ] = "none",
     out: Annotated[
         str | None,
         typer.Option(
             "--out",
             "-o",
-            help="Path to write report.",
+            help="Path to write report (.md, .json, or .html).",
         ),
     ] = None,
 ) -> None:
@@ -327,7 +360,36 @@ def analyze_command(
         )
         findings, triage_stats = orchestrator.triage(clusters, findings)
 
-    # 6. Display Summary Tables
+    # 6. Save Run to SQLite Persistence
+    meta = ReportMetadata(
+        generated_at=datetime.now(UTC),
+        log_source=target_display,
+        total_lines=total_lines,
+        parsed_events=parsed_count,
+        unparsed_lines=unparsed_count,
+        total_clusters=len(clusters),
+        findings_count=len(findings),
+    )
+    report = Report(metadata=meta, findings=findings, clusters=clusters, stats=triage_stats or {})
+    storage = StorageManager()
+    run_id = storage.save_run(report)
+
+    # 7. Write Report File if Requested
+    if out:
+        out_path = Path(out)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        content: str
+        suffix = out_path.suffix.lower()
+        if suffix == ".json":
+            content = generate_json_report(report)
+        elif suffix in (".html", ".htm"):
+            content = generate_html_report(report)
+        else:
+            content = generate_markdown_report(report)
+        out_path.write_text(content, encoding="utf-8")
+        console.print(f"[bold green]Report saved:[/bold green] {out_path.resolve()}")
+
+    # 8. Display Summary Tables
     rate = (parsed_count / total_lines * 100) if total_lines > 0 else 0.0
 
     table = Table(title="Log Parsing Summary", show_header=True, header_style="bold cyan")
@@ -356,7 +418,7 @@ def analyze_command(
 
     console.print(table)
 
-    # 7. Display Security Findings Table
+    # 9. Display Security Findings Table
     if findings:
         f_table = Table(
             title=f"Security Findings ({len(findings)})",
@@ -396,7 +458,7 @@ def analyze_command(
             )
         console.print(f_table)
 
-    # 8. Display LLM Detail Panels if available
+    # 10. Display LLM Detail Panels if available
     llm_findings = [f for f in findings if f.llm is not None]
     if llm_findings:
         console.print("\n[bold cyan]AI Triage Assessments & Recommendations[/bold cyan]")
@@ -426,7 +488,7 @@ def analyze_command(
                 )
             )
 
-    # 9. Display Clusters
+    # 11. Display Clusters
     if clusters:
         c_table = Table(
             title=f"Mined Template Clusters ({len(clusters)})",
@@ -453,7 +515,7 @@ def analyze_command(
         console.print(ip_table)
 
     status_message = (
-        f"Analyzed {parsed_count} events into {len(clusters)} clusters.\n"
+        f"Analyzed {parsed_count} events into {len(clusters)} clusters (Run ID: {run_id}).\n"
         f"Evaluated {len(loaded_rules)} rules -> Detected {len(findings)} actionable security findings."
     )
     if triage_stats:
@@ -462,6 +524,142 @@ def analyze_command(
             f"Repairs: {triage_stats['repair_attempts']} | Injections: {triage_stats['injection_attempts_detected']}"
         )
     console.print(Panel(status_message, title="Triage Complete", border_style="green"))
+
+    # 12. Exit Code Semantics
+    if fail_on and fail_on.lower() != "none":
+        thresholds = {"critical": 5, "high": 4, "medium": 3, "low": 2, "info": 1}
+        min_lvl = thresholds.get(fail_on.lower(), 4)
+        if any(thresholds.get(f.rule_severity.lower(), 1) >= min_lvl for f in findings):
+            console.print(
+                f"\n[bold red]Fail-On Threshold Triggered:[/bold red] Found security findings >= '{fail_on.upper()}'."
+            )
+            raise typer.Exit(code=2)
+
+
+@app.command(name="report")
+def report_command(
+    since: Annotated[
+        str,
+        typer.Option(
+            "--since",
+            "-s",
+            help="Time window for historical findings (e.g. 24h, 7d, 30m).",
+        ),
+    ] = "24h",
+    report_format: Annotated[
+        str,
+        typer.Option(
+            "--format",
+            "-f",
+            help="Report format (md, json, html).",
+        ),
+    ] = "md",
+    min_severity: Annotated[
+        str,
+        typer.Option(
+            "--min-severity",
+            help="Minimum severity threshold (info, low, medium, high, critical).",
+        ),
+    ] = "info",
+    out: Annotated[
+        str | None,
+        typer.Option(
+            "--out",
+            "-o",
+            help="Path to write report to.",
+        ),
+    ] = None,
+) -> None:
+    """Generate historical triage reports from stored runs."""
+    since_dt = parse_since_duration(since)
+    storage = StorageManager()
+    findings = storage.get_findings_since(since_dt, min_severity=min_severity)
+    runs = storage.list_runs(limit=10)
+
+    total_lines = sum(r.get("total_lines", 0) for r in runs)
+    parsed_events = sum(r.get("parsed_events", 0) for r in runs)
+
+    meta = ReportMetadata(
+        generated_at=datetime.now(UTC),
+        log_source=f"Historical Store (since {since})",
+        total_lines=total_lines,
+        parsed_events=parsed_events,
+        unparsed_lines=0,
+        total_clusters=0,
+        findings_count=len(findings),
+    )
+    report = Report(metadata=meta, findings=findings, clusters=[])
+
+    fmt = report_format.lower()
+    if fmt == "json":
+        rendered = generate_json_report(report)
+    elif fmt in ("html", "htm"):
+        rendered = generate_html_report(report)
+    else:
+        rendered = generate_markdown_report(report)
+
+    if out:
+        p = Path(out)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(rendered, encoding="utf-8")
+        console.print(f"[bold green]Report saved:[/bold green] {p.resolve()}")
+    else:
+        console.print(rendered)
+
+
+@app.command(name="watch")
+def watch_command(
+    target: Annotated[
+        str,
+        typer.Argument(help="Path to log file to tail and monitor in real time."),
+    ],
+    interval: Annotated[
+        float,
+        typer.Option(
+            "--interval",
+            "-i",
+            help="Debounce interval in seconds between triage cycles.",
+        ),
+    ] = 5.0,
+    notify: Annotated[
+        str | None,
+        typer.Option(
+            "--notify",
+            help="Notification channel name (telegram, discord, webhook, mock).",
+        ),
+    ] = None,
+    log_format: Annotated[
+        str,
+        typer.Option(
+            "--format",
+            "-f",
+            help="Log format (auto, auth, web, syslog, json, generic).",
+        ),
+    ] = "auto",
+) -> None:
+    """Continuously monitor a log file and trigger notifications on new security findings."""
+    log_path = Path(target)
+    if not log_path.exists():
+        console.print(f"[bold red]Error:[/bold red] Log file not found: {target}")
+        raise typer.Exit(code=1)
+
+    parser: Parser | None = None
+    if log_format != "auto":
+        parser = registry.get(log_format)
+        if not parser:
+            console.print(f"[bold red]Error:[/bold red] Unknown log format '{log_format}'.")
+            raise typer.Exit(code=1)
+
+    notifier = get_notifier(notify) if notify else None
+
+    monitor = WatchMonitor(
+        log_path=log_path,
+        parser=parser,
+        notifier=notifier,
+        interval=interval,
+        console=console,
+    )
+    monitor.run()
 
 
 # =========================================================================

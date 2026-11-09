@@ -14,3 +14,4 @@ references:
   - https://owasp.org/www-community/attacks/SQL_Injection
 false_positives:
   - Web application firewall synthetic health check test strings
+

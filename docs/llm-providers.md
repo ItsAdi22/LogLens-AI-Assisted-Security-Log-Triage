@@ -76,3 +76,4 @@ Each triage run enforces a token budget (default: 100,000 tokens). If an unexpec
 
 ### Graceful Fallback
 If an LLM endpoint is offline or experiences network timeouts, LogLens issues a warning and presents complete deterministic rule findings with exit code 0.
+

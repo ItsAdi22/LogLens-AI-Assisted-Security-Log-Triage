@@ -13,3 +13,4 @@ references:
   - https://attack.mitre.org/techniques/T1592/
 false_positives:
   - Benign web crawler indexing static directories
+

@@ -13,3 +13,4 @@ references:
   - https://attack.mitre.org/techniques/T1595/
 false_positives:
   - Administrator accessing self-hosted database console
+

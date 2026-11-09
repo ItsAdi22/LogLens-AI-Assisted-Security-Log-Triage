@@ -18,3 +18,4 @@ references:
   - https://attack.mitre.org/techniques/T1087/001/
 false_positives:
   - User mistyping their username during initial account setup
+

@@ -14,3 +14,4 @@ references:
   - https://attack.mitre.org/techniques/T1552/001/
 false_positives:
   - Vulnerability scanners authorized for posture assessments
+

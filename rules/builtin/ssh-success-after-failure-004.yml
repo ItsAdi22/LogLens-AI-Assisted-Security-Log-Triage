@@ -13,3 +13,4 @@ references:
   - https://attack.mitre.org/techniques/T1078/
 false_positives:
   - Routine administrative logins
+

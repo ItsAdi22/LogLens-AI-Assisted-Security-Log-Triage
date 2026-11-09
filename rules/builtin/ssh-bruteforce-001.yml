@@ -19,3 +19,4 @@ references:
   - https://attack.mitre.org/techniques/T1110/001/
 false_positives:
   - Misconfigured automated deployment script with an expired password
+

@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Phase 4: Reports, Notifications, Store & Watch Mode:
+  - Reporting subsystem (`src/loglens/report/`) supporting Markdown, JSON (`report_schema_version = "1.0.0"`), and self-contained HTML.
+  - Strict HTML output safety: all log-derived templates, messages, field values, and finding summaries are escaped (`html.escape()`) against XSS injection.
+  - HTML report styling with toggleable dark/light themes, metric cards, and responsive CSS layout.
+  - SQLite storage manager (`src/loglens/store/db.py`) persisting runs, clusters, findings, and schema migrations with parameter-bound SQL queries.
+  - `loglens report [--since 24h] [--format md|json|html] [--out FILE]` CLI command querying historical triage runs.
+  - Multi-channel notification subsystem (`src/loglens/notify/`) supporting Telegram bot alerts/digests, Discord webhook embeds, and HMAC-SHA256 authenticated JSON webhooks.
+  - `CooldownTracker` eliminating alert spam by deduplicating repeated findings within configurable windows.
+  - Real-time continuous monitoring `loglens watch <path>` with debounce batching, rotation detection, and signal handling.
+  - Pipeline exit code semantics: exit code 2 when security findings meet or exceed `--fail-on` threshold (ideal for CI/CD and cron jobs).
 - Phase 3: Redaction & LLM Triage:
   - Reversible token-based anonymization engine (`Redactor`) with levels `standard`, `strict`, and `off`.
   - Comprehensive regex extractors for IPv4, IPv6, email addresses, JWT tokens, AWS access keys, Bearer tokens, URL credentials, query string secrets, and private keys.

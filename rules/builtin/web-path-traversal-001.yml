@@ -14,3 +14,4 @@ references:
   - https://owasp.org/www-community/attacks/Path_Traversal
 false_positives:
   - Security audit scans conducted by authorized internal teams
+
