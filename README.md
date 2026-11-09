@@ -136,7 +136,7 @@ LogLens includes an automated 12-scenario ground-truth evaluation suite (`tests/
 - [x] **Phase 3**: Reversible token redaction, multi-provider LLM triage (Ollama, OpenAI, Gemini, Anthropic), injection guardrails
 - [x] **Phase 4**: Reports (MD, JSON, HTML), SQLite historical store, notifiers (Telegram, Discord, Webhook), `watch` mode
 - [x] **Phase 5**: Ground-truth eval suite, Docker packaging, MkDocs documentation, **v0.1.0 release**
-- [ ] **Phase 6**: Lightweight Web UI (FastAPI + HTMX)
+- [x] **Phase 6**: Lightweight Web UI (FastAPI + HTMX dashboard & on-demand AI explanations)
 - [ ] **Phase 7**: Additional parsers (Minecraft, Pterodactyl, fail2ban, ufw) & Sigma import
 - [ ] **Phase 8**: Production hardening & v1.0 release
 

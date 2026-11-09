@@ -875,6 +875,73 @@ def rules_test_command(
         )
 
 
+@app.command()
+def serve(
+    host: Annotated[
+        str,
+        typer.Option("--host", help="Host IP address to bind the web server to."),
+    ] = "127.0.0.1",
+    port: Annotated[
+        int,
+        typer.Option("--port", help="Port number to listen on."),
+    ] = 8080,
+    db: Annotated[
+        Path | None,
+        typer.Option("--db", help="Custom SQLite database path to load runs from."),
+    ] = None,
+    token: Annotated[
+        str | None,
+        typer.Option(
+            "--token",
+            envvar="LOGLENS_WEB_TOKEN",
+            help="Optional authentication token required to access dashboard and APIs.",
+        ),
+    ] = None,
+    provider: Annotated[
+        str,
+        typer.Option(
+            "--provider",
+            help="LLM provider for on-demand explanations (ollama, mock, etc.).",
+        ),
+    ] = "ollama",
+    model: Annotated[
+        str | None,
+        typer.Option("--model", help="LLM model identifier for on-demand explanations."),
+    ] = None,
+) -> None:
+    """Launch the LogLens local Web UI dashboard (FastAPI + HTMX)."""
+    try:
+        import uvicorn
+
+        from loglens.web import create_app
+    except ImportError as err:
+        console.print(
+            f"[bold red]Web dependencies missing:[/bold red] {err}. "
+            "Install with: [bold cyan]pip install 'loglens[web]'[/bold cyan]"
+        )
+        raise typer.Exit(code=1) from err
+
+    web_app = create_app(
+        db_path=db,
+        auth_token=token,
+        provider_name=provider,
+        model=model,
+    )
+
+    console.print(
+        Panel.fit(
+            f"[bold cyan]LogLens Web UI Dashboard[/bold cyan]\n"
+            f"Listening on: [bold green]http://{host}:{port}[/bold green]\n"
+            f"Database: [dim]{db or 'default'}[/dim]\n"
+            f"Auth Token: [dim]{'Enabled' if token else 'Disabled (Local only)'}[/dim]\n"
+            f"AI Provider: [dim]{provider}[/dim]",
+            border_style="cyan",
+        )
+    )
+
+    uvicorn.run(web_app, host=host, port=port, log_level="info")
+
+
 def main() -> None:
     """Main CLI execution function."""
     app()

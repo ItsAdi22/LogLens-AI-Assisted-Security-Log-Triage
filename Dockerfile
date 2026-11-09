@@ -44,3 +44,4 @@ VOLUME ["/logs", "/config"]
 
 ENTRYPOINT ["loglens"]
 CMD ["--help"]
+

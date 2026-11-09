@@ -108,3 +108,68 @@ def test_storage_get_findings_since_and_severity_filter() -> None:
     assert len(future_findings) == 0
 
     storage.close()
+
+
+def test_storage_get_finding_and_cluster() -> None:
+    storage = StorageManager(db_path=":memory:")
+    rep = create_test_report()
+    run_id = storage.save_run(rep, run_id="run-fc-01")
+
+    # get_finding
+    finding = storage.get_finding(run_id, "f-001")
+    assert finding is not None
+    assert finding.id == "f-001"
+    assert finding.rule_severity == "high"
+
+    # get_finding not found
+    assert storage.get_finding(run_id, "nonexistent") is None
+
+    # get_cluster
+    cluster = storage.get_cluster(run_id, "c-001")
+    assert cluster is not None
+    assert cluster.id == "c-001"
+    assert "Failed password" in cluster.template
+
+    # get_cluster not found
+    assert storage.get_cluster(run_id, "nonexistent") is None
+
+    # update_finding_assessment
+    new_assessment = LLMAssessment(
+        summary="Updated forensic explanation",
+        attack_type="credential_stuffing",
+        severity="critical",
+        confidence=0.99,
+        evidence=["Multiple IPs targeted same account"],
+        recommended_actions=["Deploy rate limiting"],
+        false_positive_likelihood="low",
+    )
+    success = storage.update_finding_assessment(run_id, "f-001", new_assessment)
+    assert success is True
+
+    updated_finding = storage.get_finding(run_id, "f-001")
+    assert updated_finding is not None
+    assert updated_finding.llm is not None
+    assert updated_finding.llm.attack_type == "credential_stuffing"
+    assert updated_finding.llm.confidence == 0.99
+
+    storage.close()
+
+
+def test_storage_global_and_timeline_stats() -> None:
+    storage = StorageManager(db_path=":memory:")
+    rep = create_test_report()
+    storage.save_run(rep, run_id="run-stat-01")
+
+    stats = storage.get_global_stats()
+    assert stats["total_runs"] == 1
+    assert stats["total_events"] == 95
+    assert stats["total_clusters"] == 1
+    assert stats["total_findings"] == 1
+    assert stats["severity_counts"]["high"] == 1
+
+    timeline = storage.get_timeline_stats(days=5)
+    assert len(timeline) >= 1
+    assert timeline[0]["run_count"] == 1
+    assert timeline[0]["total_findings"] == 1
+
+    storage.close()

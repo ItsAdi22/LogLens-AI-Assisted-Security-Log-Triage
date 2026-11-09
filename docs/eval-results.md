@@ -48,3 +48,4 @@ python -m tests.eval.run --provider openai_compat --model gpt-4o-mini
 # Offline deterministic verification (used in CI)
 python -m tests.eval.run --provider mock
 ```
+

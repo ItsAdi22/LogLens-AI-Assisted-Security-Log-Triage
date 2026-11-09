@@ -195,3 +195,14 @@ def test_cli_rules_test_no_match(cli_runner: CliRunner, tmp_path: Path) -> None:
     result = cli_runner.invoke(app, ["rules", "test", str(rule_file), "--against", str(log_file)])
     assert result.exit_code == 0
     assert "NO MATCH" in result.output
+
+
+def test_cli_serve_help(cli_runner: CliRunner) -> None:
+    """Verify `loglens serve --help` displays all flags."""
+    result = cli_runner.invoke(app, ["serve", "--help"])
+    assert result.exit_code == 0
+    assert "--host" in result.output
+    assert "--port" in result.output
+    assert "--db" in result.output
+    assert "--token" in result.output
+    assert "--provider" in result.output

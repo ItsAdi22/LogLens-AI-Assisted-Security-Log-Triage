@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}LogLens — Run {{ run_id }}{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 1.5rem;">
+  <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+    <a href="/" style="color: var(--accent-primary); text-decoration: none;">&larr; Dashboard</a> / Run Details
+  </div>
+  <div style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <h1 style="font-size: 1.6rem; font-weight: 700; font-family: var(--font-mono);">{{ run_id }}</h1>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">
+        Analyzed source: <span class="code">{{ report.metadata.log_source }}</span> &bull; {{ report.metadata.generated_at }}
+      </p>
+    </div>
+    <div>
+      <a href="/api/runs/{{ run_id }}" class="btn btn-secondary" target="_blank">Export JSON</a>
+    </div>
+  </div>
+</div>
+
+<!-- Run Metadata Summary -->
+<div class="metric-grid">
+  <div class="metric-box">
+    <div class="metric-label">Parsed Events</div>
+    <div class="metric-value">{{ "{:,}".format(report.metadata.parsed_events) }}</div>
+  </div>
+  <div class="metric-box">
+    <div class="metric-label">Unparsed Lines</div>
+    <div class="metric-value">{{ report.metadata.unparsed_lines }}</div>
+  </div>
+  <div class="metric-box">
+    <div class="metric-label">Clustered Patterns</div>
+    <div class="metric-value">{{ report.metadata.total_clusters }}</div>
+  </div>
+  <div class="metric-box">
+    <div class="metric-label">Security Findings</div>
+    <div class="metric-value" style="color: {% if report.findings|length > 0 %}#f87171{% else %}var(--text-main){% endif %};">
+      {{ report.findings|length }}
+    </div>
+  </div>
+</div>
+
+<!-- Findings Section -->
+<div style="margin-bottom: 2.5rem;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <h2 style="font-size: 1.25rem; font-weight: 600;">Security Findings & Detections</h2>
+    <span style="color: var(--text-muted); font-size: 0.85rem;">{{ report.findings|length }} detected</span>
+  </div>
+
+  {% if report.findings %}
+    {% for finding in report.findings %}
+      {% include "partials/finding_card.html" %}
+    {% endfor %}
+  {% else %}
+    <div class="card" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+      <p style="color: #6ee7b7; font-weight: 600; font-size: 1.05rem;">No Security Findings Detected</p>
+      <p style="font-size: 0.85rem; margin-top: 0.25rem;">This log file matched no attack signatures and exhibited no anomalous cluster spikes.</p>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Clustered Log Signatures (Drain3) -->
+<div>
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <h2 style="font-size: 1.25rem; font-weight: 600;">Mined Cluster Signatures (Drain3)</h2>
+    <span style="color: var(--text-muted); font-size: 0.85rem;">{{ report.clusters|length }} template groups</span>
+  </div>
+
+  <div class="card" style="padding: 0; overflow-x: auto;">
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 80px;">Cluster</th>
+          <th>Template Pattern (<span class="wildcard">&lt;*&gt;</span> parameters)</th>
+          <th style="width: 90px;">Count</th>
+          <th>Top Extracted Fields</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cluster in report.clusters %}
+          <tr id="cluster-{{ cluster.id }}">
+            <td style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-primary);">
+              #{{ cluster.id }}
+            </td>
+            <td>
+              <div style="font-family: var(--font-mono); font-size: 0.85rem; word-break: break-all;">
+                {{ cluster.template|replace('<*>', '<span class="wildcard">&lt;*&gt;</span>')|safe }}
+              </div>
+            </td>
+            <td style="font-weight: 700;">
+              {{ "{:,}".format(cluster.count) }}
+            </td>
+            <td>
+              <div style="font-size: 0.8rem; color: var(--text-muted);">
+                {% for field_name, items in cluster.top_fields.items() %}
+                  <div>
+                    <strong style="color: var(--text-main);">{{ field_name }}:</strong>
+                    {% for item in items[:3] %}
+                      <span class="code" style="font-size: 0.75rem;">{{ item[0] }} ({{ item[1] }})</span>
+                    {% endfor %}
+                  </div>
+                {% endfor %}
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

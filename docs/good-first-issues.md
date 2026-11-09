@@ -81,3 +81,4 @@ Here is a curated list of well-scoped, bite-sized tasks ready for community cont
 1. Pick any issue above and leave a comment on the GitHub issue tracker to claim it.
 2. Read [CONTRIBUTING.md](https://github.com/ItsAdi22/LogLens-AI-Assisted-Security-Log-Triage/blob/main/CONTRIBUTING.md) for environment setup and testing guidelines.
 3. Open a Pull Request following conventional commits (`feat:`, `fix:`, `docs:`). All PRs run CI with type checking (`mypy --strict`) and linting (`ruff`).
+

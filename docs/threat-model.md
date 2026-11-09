@@ -86,3 +86,4 @@ flowchart TD
 
 If you discover a security vulnerability in LogLens, please report it privately following our [Security Policy](https://github.com/ItsAdi22/LogLens-AI-Assisted-Security-Log-Triage/security/policy).
 Do not create public GitHub issues for security vulnerabilities.
+

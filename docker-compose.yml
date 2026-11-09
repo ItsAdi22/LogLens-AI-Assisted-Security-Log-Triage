@@ -24,3 +24,4 @@ services:
 volumes:
   loglens_data:
   ollama_models:
+

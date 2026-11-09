@@ -499,10 +499,10 @@ A thin **vertical slice** (analyze auth.log → rules → LLM → markdown repor
 
 ### Phase 6 — Web UI (1.5–2 weeks)
 
-- [ ] FastAPI + HTMX dashboard: runs list, findings table, cluster drill-down, severity filters, timeline chart
-- [ ] Bind to `127.0.0.1` by default; optional token auth; CSRF protection; strict CSP; escape all log data
-- [ ] Finding detail page with "explain" button (calls LLM on demand)
-- [ ] Docs + screenshots
+- [x] FastAPI + HTMX dashboard: runs list, findings table, cluster drill-down, severity filters, timeline chart
+- [x] Bind to `127.0.0.1` by default; optional token auth; CSRF protection; strict CSP; escape all log data
+- [x] Finding detail page with "explain" button (calls LLM on demand)
+- [x] Docs + screenshots
 
 ### Phase 7 — Ecosystem (2–3 weeks)
 

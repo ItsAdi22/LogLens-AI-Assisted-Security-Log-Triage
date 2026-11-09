@@ -65,3 +65,4 @@ python -m tests.eval.run --provider ollama --model llama3.2
 python scripts/gen_synthetic_logs.py --count 100000 --out test_large.log
 loglens analyze test_large.log --no-llm
 ```
+

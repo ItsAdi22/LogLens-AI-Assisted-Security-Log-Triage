@@ -27,7 +27,7 @@ class StorageManager:
         else:
             self.db_path = ":memory:"
 
-        self._conn = sqlite3.connect(self.db_path)
+        self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._apply_migrations()
 
@@ -305,6 +305,151 @@ class StorageManager:
             ]
 
         return findings
+
+    def get_finding(self, run_id: str, finding_id: str) -> Finding | None:
+        """Fetch a single finding by run_id and finding_id."""
+        cursor = self._conn.cursor()
+        cursor.execute(
+            "SELECT * FROM findings WHERE run_id = ? AND id = ?",
+            (run_id, finding_id),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+
+        llm_assessment = None
+        if row["llm_summary"]:
+            llm_assessment = LLMAssessment(
+                summary=row["llm_summary"],
+                attack_type=row["llm_attack_type"],
+                severity=row["llm_severity"],
+                confidence=row["llm_confidence"],
+                evidence=json.loads(row["llm_evidence_json"] or "[]"),
+                recommended_actions=json.loads(row["llm_actions_json"] or "[]"),
+                false_positive_likelihood=row["llm_fp_likelihood"] or "low",
+            )
+        return Finding(
+            id=row["id"],
+            cluster_ids=json.loads(row["cluster_ids_json"]),
+            rule_ids=json.loads(row["rule_ids_json"]),
+            rule_severity=row["rule_severity"],
+            llm=llm_assessment,
+        )
+
+    def get_cluster(self, run_id: str, cluster_id: str) -> Cluster | None:
+        """Fetch a single cluster by run_id and cluster_id."""
+        cursor = self._conn.cursor()
+        cursor.execute(
+            "SELECT * FROM clusters WHERE run_id = ? AND id = ?",
+            (run_id, cluster_id),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+
+        return Cluster(
+            id=row["id"],
+            template=row["template"],
+            count=row["count"],
+            first_seen=datetime.fromisoformat(row["first_seen"]),
+            last_seen=datetime.fromisoformat(row["last_seen"]),
+            top_fields=json.loads(row["top_fields_json"]),
+        )
+
+    def update_finding_assessment(
+        self, run_id: str, finding_id: str, assessment: LLMAssessment
+    ) -> bool:
+        """Update an existing finding with on-demand LLM assessment results."""
+        with self._conn:
+            cursor = self._conn.execute(
+                """
+                UPDATE findings
+                SET llm_summary = ?,
+                    llm_attack_type = ?,
+                    llm_severity = ?,
+                    llm_confidence = ?,
+                    llm_evidence_json = ?,
+                    llm_actions_json = ?,
+                    llm_fp_likelihood = ?
+                WHERE run_id = ? AND id = ?
+                """,
+                (
+                    assessment.summary,
+                    assessment.attack_type,
+                    assessment.severity,
+                    assessment.confidence,
+                    json.dumps(assessment.evidence),
+                    json.dumps(assessment.recommended_actions),
+                    assessment.false_positive_likelihood,
+                    run_id,
+                    finding_id,
+                ),
+            )
+            return cursor.rowcount > 0
+
+    def get_global_stats(self) -> dict[str, Any]:
+        """Compute aggregated statistics across all runs and findings."""
+        cursor = self._conn.cursor()
+        cursor.execute("SELECT COUNT(*), COALESCE(SUM(parsed_events), 0) FROM runs")
+        total_runs, total_events = cursor.fetchone()
+
+        cursor.execute("SELECT COUNT(*) FROM clusters")
+        total_clusters = cursor.fetchone()[0]
+
+        cursor.execute(
+            """
+            SELECT rule_severity, COUNT(*)
+            FROM findings
+            GROUP BY rule_severity
+            """
+        )
+        sev_counts: dict[str, int] = {
+            "critical": 0,
+            "high": 0,
+            "medium": 0,
+            "low": 0,
+            "info": 0,
+        }
+        for sev, count in cursor.fetchall():
+            s = str(sev).lower()
+            sev_counts[s] = count
+
+        return {
+            "total_runs": total_runs,
+            "total_events": total_events,
+            "total_clusters": total_clusters,
+            "total_findings": sum(sev_counts.values()),
+            "severity_counts": sev_counts,
+        }
+
+    def get_timeline_stats(self, days: int = 7) -> list[dict[str, Any]]:
+        """Return run counts and finding counts aggregated by date."""
+        cursor = self._conn.cursor()
+        cursor.execute(
+            """
+            SELECT substr(generated_at, 1, 10) as day,
+                   COUNT(run_id) as run_count,
+                   SUM(findings_count) as total_findings,
+                   SUM(parsed_events) as total_events
+            FROM runs
+            GROUP BY day
+            ORDER BY day DESC
+            LIMIT ?
+            """,
+            (days,),
+        )
+        rows = cursor.fetchall()
+        timeline = []
+        for r in reversed(rows):
+            timeline.append(
+                {
+                    "day": r["day"],
+                    "run_count": r["run_count"],
+                    "total_findings": r["total_findings"] or 0,
+                    "total_events": r["total_events"] or 0,
+                }
+            )
+        return timeline
 
     def close(self) -> None:
         """Close SQLite database connection."""

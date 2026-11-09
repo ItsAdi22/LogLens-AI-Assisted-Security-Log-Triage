@@ -137,3 +137,4 @@ Set up a nightly cron job to summarize daily incidents and send an alert to your
 ```bash
 0 0 * * * /usr/local/bin/loglens analyze /var/log/auth.log --since 24h --llm --provider ollama --out /var/reports/daily.html
 ```
+

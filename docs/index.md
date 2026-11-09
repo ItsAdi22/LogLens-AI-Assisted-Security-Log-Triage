@@ -27,3 +27,4 @@ It bridges the gap between simple rule matchers (like `fail2ban`) and heavyweigh
 2. **Local by Default**: Designed to run 100% offline with local Ollama or pure deterministic rule mode (`--no-llm`).
 3. **Cloud LLM Consent Gate**: Explicit consent (`--agree-cloud-llm`) is required before any anonymized cluster summaries are transmitted to external cloud providers.
 4. **XSS-Safe Reporting**: All HTML report strings derived from log lines are escaped against script injection attacks.
+

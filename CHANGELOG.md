@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+- **Phase 6: Web UI & Timeline Inspection**:
+  - Web dashboard package (`src/loglens/web/`) built using FastAPI, Jinja2, and vendored HTMX (zero Node/npm build steps).
+  - 100% offline, self-hosted frontend with vendored HTMX (`/static/js/htmx.min.js`).
+  - Security hardening: bound to `127.0.0.1` by default, optional Bearer/query token authentication, strict CSP header, frame-ancestors blocking, and Jinja2 autoescaping.
+  - Interactive dashboard (`/`) displaying metric cards, severity distribution bar, 7-day incident activity timeline, and filterable ingestion runs.
+  - Run detail inspection (`/runs/{run_id}`) displaying parsed events, cluster breakdown with `<*>` wildcard highlighting, and security findings.
+  - On-demand AI incident explanation (`POST /runs/{run_id}/findings/{finding_id}/explain`) via HTMX with persistent SQLite updates.
+  - REST API endpoints for telemetry integration (`/api/stats`, `/api/runs`, `/api/runs/{run_id}`, `/health`).
+  - `loglens serve` CLI command with `--host`, `--port`, `--db`, `--token`, and `--provider` options.
+  - Comprehensive documentation: `docs/web-ui.md`.
+
 ## [0.1.0] - 2026-11-09
 
 ### Added

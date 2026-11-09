@@ -45,3 +45,4 @@ body:
       description: Provide 2-5 synthetic log lines that should match this detection rule. NEVER include real credentials or production secrets!
     validations:
       required: true
+

@@ -1,0 +1,220 @@
+"""Unit and integration tests for the LogLens Web UI (FastAPI + HTMX)."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+from loglens.models import Cluster, Finding, LLMAssessment, Report, ReportMetadata
+from loglens.store import StorageManager
+from loglens.web.app import create_app
+
+
+def create_sample_report() -> Report:
+    """Construct a sample Report instance for web UI tests."""
+    cluster1 = Cluster(
+        id="c-01",
+        template="Failed password for invalid user <*>",
+        count=15,
+        first_seen=datetime.now(UTC),
+        last_seen=datetime.now(UTC),
+        top_fields={"user": [("admin", 10), ("root", 5)]},
+    )
+    cluster2 = Cluster(
+        id="c-02",
+        template="Accepted publickey for deploy",
+        count=2,
+        first_seen=datetime.now(UTC),
+        last_seen=datetime.now(UTC),
+        top_fields={"user": [("deploy", 2)]},
+    )
+
+    finding1 = Finding(
+        id="f-01",
+        cluster_ids=["c-01"],
+        rule_ids=["ssh_bruteforce"],
+        rule_severity="high",
+        llm=None,
+    )
+
+    metadata = ReportMetadata(
+        generated_at=datetime.now(UTC),
+        log_source="/var/log/auth.log",
+        total_lines=50,
+        parsed_events=48,
+        unparsed_lines=2,
+        total_clusters=2,
+        findings_count=1,
+    )
+
+    return Report(
+        metadata=metadata,
+        findings=[finding1],
+        clusters=[cluster1, cluster2],
+        stats={"auth_failures": 15},
+    )
+
+
+def test_health_check(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    response = client.get("/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["version"] == "0.1.0"
+
+
+def test_security_headers(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    response = client.get("/health")
+    assert "Content-Security-Policy" in response.headers
+    assert "default-src 'self'" in response.headers["Content-Security-Policy"]
+    assert response.headers["X-Frame-Options"] == "DENY"
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+
+
+def test_dashboard_empty_db(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "Security Triage Operations" in response.text
+    assert "No triage runs recorded yet" in response.text
+
+
+def test_dashboard_with_runs(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    storage = StorageManager(db_file)
+    report = create_sample_report()
+    run_id = storage.save_run(report, run_id="run-test-123")
+    storage.close()
+
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    response = client.get("/")
+    assert response.status_code == 200
+    assert run_id in response.text
+    assert "/var/log/auth.log" in response.text
+    assert "1 Findings" in response.text
+
+
+def test_run_detail_found(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    storage = StorageManager(db_file)
+    report = create_sample_report()
+    run_id = storage.save_run(report, run_id="run-detail-456")
+    storage.close()
+
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    response = client.get(f"/runs/{run_id}")
+    assert response.status_code == 200
+    assert run_id in response.text
+    assert "Failed password for invalid user" in response.text
+    assert "ssh_bruteforce" in response.text
+    assert "Explain with AI" in response.text
+
+
+def test_run_detail_not_found(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    response = client.get("/runs/nonexistent-run")
+    assert response.status_code == 404
+    assert "not found" in response.text
+
+
+def test_explain_finding_on_demand_htmx(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    storage = StorageManager(db_file)
+    report = create_sample_report()
+    run_id = storage.save_run(report, run_id="run-explain-789")
+    storage.close()
+
+    app = create_app(db_path=db_file, provider_name="mock")
+    client = TestClient(app)
+
+    # Post HTMX explain request
+    response = client.post(f"/runs/{run_id}/findings/f-01/explain")
+    assert response.status_code == 200
+    assert "AI Threat Assessment" in response.text
+    assert "Confidence:" in response.text
+
+    # Verify assessment persisted in SQLite
+    storage2 = StorageManager(db_file)
+    updated_run = storage2.get_run(run_id)
+    assert updated_run is not None
+    assert updated_run.findings[0].llm is not None
+    assert isinstance(updated_run.findings[0].llm, LLMAssessment)
+    storage2.close()
+
+
+def test_token_authentication(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    secret_token = "secret-soc-token-99"
+    app = create_app(db_path=db_file, auth_token=secret_token)
+    client = TestClient(app)
+
+    # Missing token -> 401
+    resp_unauth = client.get("/")
+    assert resp_unauth.status_code == 401
+
+    # Invalid token -> 401
+    resp_bad = client.get("/", headers={"Authorization": "Bearer wrong-token"})
+    assert resp_bad.status_code == 401
+
+    # Valid Bearer header -> 200
+    resp_ok = client.get("/", headers={"Authorization": f"Bearer {secret_token}"})
+    assert resp_ok.status_code == 200
+
+    # Valid query param -> 200
+    resp_query = client.get(f"/?token={secret_token}")
+    assert resp_query.status_code == 200
+
+
+def test_api_endpoints(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    storage = StorageManager(db_file)
+    report = create_sample_report()
+    run_id = storage.save_run(report, run_id="run-api-001")
+    storage.close()
+
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    # /api/stats
+    resp_stats = client.get("/api/stats")
+    assert resp_stats.status_code == 200
+    stats = resp_stats.json()
+    assert stats["total_runs"] == 1
+    assert stats["total_findings"] == 1
+    assert stats["severity_counts"]["high"] == 1
+
+    # /api/runs
+    resp_runs = client.get("/api/runs")
+    assert resp_runs.status_code == 200
+    runs = resp_runs.json()
+    assert len(runs) == 1
+    assert runs[0]["run_id"] == run_id
+
+    # /api/runs/{run_id}
+    resp_run = client.get(f"/api/runs/{run_id}")
+    assert resp_run.status_code == 200
+    run_data = resp_run.json()
+    assert run_data["metadata"]["total_lines"] == 50
+    assert len(run_data["findings"]) == 1

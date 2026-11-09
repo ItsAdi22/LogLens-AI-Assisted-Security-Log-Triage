@@ -82,3 +82,4 @@ flowchart TD
   - `JsonReporter`: Exports versioned JSON conforming to `report_schema_version = "1.0.0"`.
   - `HtmlReporter`: Produces self-contained, XSS-escaped HTML dashboards with dark/light themes.
 * **Alerting Dispatchers** (`loglens.notify`): Dispatches structured alerts to Discord, Telegram, or custom webhook endpoints with deduplication fingerprints and configurable cooldown intervals.
+

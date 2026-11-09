@@ -29,6 +29,7 @@ nav:
   - Overview: index.md
   - Quickstart: quickstart.md
   - Architecture: architecture.md
+  - Web Dashboard: web-ui.md
   - Threat Model: threat-model.md
   - Privacy & Redaction: privacy-and-redaction.md
   - LLM Providers: llm-providers.md
@@ -54,3 +55,4 @@ markdown_extensions:
   - pymdownx.tabbed:
       alternate_style: true
   - tables
+
