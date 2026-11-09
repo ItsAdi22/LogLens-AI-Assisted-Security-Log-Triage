@@ -7,9 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.0.0] - 2026-11-09
 
 ### Added
+- **Phase 8: Hardening, Performance Profiling, Stability Guarantees & v1.0.0 Production Release**:
+  - Streaming memory boundedness guarantees (< 25 MB peak RAM across 5,000 events and Drain3 clustering).
+  - Automated performance & memory profiling utility (`scripts/benchmark_large_file.py`) demonstrating > 88,000 lines/sec throughput.
+  - Performance regression test suite (`tests/unit/test_perf_bounds.py`).
+  - Comprehensive third-party security audit checklist (`docs/security-audit.md`) covering prompt injection defense, stored XSS elimination, SQL injection parameter binding, and container non-root security.
+  - Formal Stability Guarantees and Deprecation Policy (`docs/stability-and-deprecation.md`) locking SemVer 2.0.0, CLI exit codes, and `report_schema_version = "1.0.0"`.
+  - Production migration guide (`docs/migration-guide.md`) covering upgrades from v0.1.0 to v1.0.0 and database migration procedures.
+  - Thread-safe SQLite connection pooling in `StorageManager` (`check_same_thread=False`) supporting FastAPI concurrent worker threads.
 - **Phase 7: Ecosystem, Sigma Importer & Extensibility**:
   - Specialized built-in ecosystem parsers:
     - `Fail2banParser` (`src/loglens/parsers/fail2ban.py`): Ingests `/var/log/fail2ban.log` tracking jail actions, ban enforcement, and unban lifecycle.

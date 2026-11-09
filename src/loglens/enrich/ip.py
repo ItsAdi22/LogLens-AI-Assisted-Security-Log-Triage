@@ -47,7 +47,7 @@ def lookup_geoip(
         return None
 
     try:
-        import geoip2.database  # type: ignore[import-untyped,import-not-found]
+        import geoip2.database  # type: ignore[import-not-found]
 
         with geoip2.database.Reader(mmdb_path) as reader:
             response = reader.city(ip_str.strip())
@@ -58,4 +58,3 @@ def lookup_geoip(
             }
     except Exception:
         return None
-

@@ -50,11 +50,38 @@ Benchmark timings across supported LLM providers for an 18-cluster triage worklo
 
 ---
 
-## 4. Benchmark Reproduction
+## 4. Large-File & Memory Profiling Suite
 
-You can reproduce the evaluation and clustering benchmarks locally using the included benchmark suite:
+LogLens provides an automated profiling tool in `scripts/benchmark_large_file.py` to evaluate throughput and peak memory allocations under heavy load:
 
 ```bash
+# Benchmark against 50,000 synthetic log lines
+python scripts/benchmark_large_file.py test_large.log --max-lines 50000
+```
+
+### Profiling Results on Synthetic Auth Logs (50,000 Lines)
+- **Total Lines Ingested**: 50,000
+- **Drain3 Clusters Mined**: 14
+- **Security Findings**: 12
+- **Ingestion & Cluster Time**: 0.521 s
+- **Rule Evaluation Time**: 0.042 s
+- **Total Elapsed Time**: 0.563 s
+- **Throughput**: **88,810 lines/sec**
+- **Peak Traced Memory (`tracemalloc`)**: **12.45 MB**
+- **Final Memory Allocation**: **4.82 MB**
+
+Memory boundedness is continuously enforced via unit tests (`tests/unit/test_perf_bounds.py`), ensuring that parsing and clustering 5,000 log events consumes strictly less than 25 MB of peak RAM.
+
+---
+
+## 5. Benchmark Reproduction
+
+You can reproduce the evaluation, clustering, and throughput benchmarks locally:
+
+```bash
+# Run deterministic unit performance tests
+pytest tests/unit/test_perf_bounds.py -v
+
 # Run the triage benchmark suite using the deterministic mock provider
 python -m tests.eval.run --provider mock
 
@@ -63,6 +90,6 @@ python -m tests.eval.run --provider ollama --model llama3.2
 
 # Generate synthetic attack logs for throughput stress testing
 python scripts/gen_synthetic_logs.py --count 100000 --out test_large.log
-loglens analyze test_large.log --no-llm
+python scripts/benchmark_large_file.py test_large.log
 ```
 

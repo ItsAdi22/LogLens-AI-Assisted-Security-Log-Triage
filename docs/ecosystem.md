@@ -87,3 +87,4 @@ loglens export-actions report.json --target cloudflare --out cloudflare_waf.json
 # Export fail2ban-client manual ban commands
 loglens export-actions report.json --target fail2ban --out fail2ban_bans.sh
 ```
+

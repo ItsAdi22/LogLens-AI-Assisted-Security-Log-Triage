@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "loglens"
-version = "0.1.0.dev0"
+version = "1.0.0"
 description = "AI-Assisted Security Log Triage (Open Source)"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -23,7 +23,7 @@ keywords = [
     "cybersecurity",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: System Administrators",
     "Intended Audience :: Information Technology",
     "License :: OSI Approved :: Apache Software License",

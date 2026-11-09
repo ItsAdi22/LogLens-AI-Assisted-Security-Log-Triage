@@ -51,7 +51,7 @@ def create_app(
     app = FastAPI(
         title="LogLens Web UI",
         description="Local-first AI-assisted security log triage dashboard",
-        version="0.1.0",
+        version="1.0.0",
     )
 
     # Security headers

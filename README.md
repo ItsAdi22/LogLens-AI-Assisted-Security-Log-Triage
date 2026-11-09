@@ -67,7 +67,7 @@ Run LogLens in a lightweight, non-root isolated container:
 
 ```bash
 # Analyze host logs mounted read-only
-docker run --rm -v /var/log:/logs:ro ghcr.io/itsadi22/loglens:v0.1.0 analyze /logs/auth.log --no-llm
+docker run --rm -v /var/log:/logs:ro ghcr.io/itsadi22/loglens:v1.0.0 analyze /logs/auth.log --no-llm
 
 # Run with full Ollama stack via docker-compose
 docker compose up -d
@@ -104,6 +104,12 @@ loglens watch /var/log/auth.log --interval 5s --notify telegram
 # Query historical incidents from local SQLite store
 loglens report --since 24h --format html --out daily_digest.html
 
+# Local-first Web UI dashboard with HTMX & on-demand AI explanations
+loglens serve --host 127.0.0.1 --port 8080
+
+# Export advisory firewall drop rules from triage report
+loglens export-actions report.json --target nftables --out /etc/nftables.d/threats.nft
+
 # Inspect, validate, and test MITRE ATT&CK detection rules
 loglens rules list
 loglens rules validate custom_rules.yml
@@ -138,7 +144,7 @@ LogLens includes an automated 12-scenario ground-truth evaluation suite (`tests/
 - [x] **Phase 5**: Ground-truth eval suite, Docker packaging, MkDocs documentation, **v0.1.0 release**
 - [x] **Phase 6**: Lightweight Web UI (FastAPI + HTMX dashboard & on-demand AI explanations)
 - [x] **Phase 7**: Ecosystem parsers (Fail2ban, UFW, DatabaseAuth, Minecraft, Pterodactyl, Docker), Sigma import & action export
-- [ ] **Phase 8**: Production hardening & v1.0 release
+- [x] **Phase 8**: Production hardening, performance profiling, stability guarantees & **v1.0.0 release**
 
 ---
 

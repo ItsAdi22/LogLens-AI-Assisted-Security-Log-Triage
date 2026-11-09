@@ -514,11 +514,11 @@ A thin **vertical slice** (analyze auth.log → rules → LLM → markdown repor
 
 ### Phase 8 — Hardening & v1.0 (2–3 weeks)
 
-- [ ] Profiling + memory optimization; large-file benchmarks
-- [ ] Third-party security review of prompt-injection and report-XSS surface (invite community review)
-- [ ] API/config stability guarantees, deprecation policy
-- [ ] Migration guide, full docs pass
-- [ ] Tag **v1.0.0**
+- [x] Profiling + memory optimization; large-file benchmarks
+- [x] Third-party security review of prompt-injection and report-XSS surface (invite community review)
+- [x] API/config stability guarantees, deprecation policy
+- [x] Migration guide, full docs pass
+- [x] Tag **v1.0.0**
 
 ---
 

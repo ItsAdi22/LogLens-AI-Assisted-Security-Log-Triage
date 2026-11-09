@@ -70,4 +70,3 @@ def test_lookup_geoip_graceful_fallback() -> None:
     assert lookup_geoip("198.51.100.22", mmdb_path=None) is None
     assert lookup_geoip("192.168.1.1", mmdb_path="fake.mmdb") is None
     assert lookup_geoip("198.51.100.22", mmdb_path="nonexistent.mmdb") is None
-
