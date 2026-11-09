@@ -38,9 +38,28 @@ flowchart LR
 
 ---
 
-## 🚀 Quickstart (3 Commands)
+## 🚀 Quickstart
 
-### 1. Install LogLens
+### ⚡ One-Command Instant Launch (Web Dashboard)
+Clone the repo and launch the interactive security console directly:
+```bash
+# Windows
+.\run.bat
+
+# Linux / macOS
+python run.py
+```
+*Automatically pre-populates sample attack telemetry, launches the dashboard on `http://127.0.0.1:8080`, and opens your default web browser.*
+
+Other shortcuts:
+- `.\run.bat --demo` (or `python run.py --demo`): Watch an interactive terminal walkthrough.
+- `.\run.bat --test` (or `python run.py --test`): Run all unit tests, AI benchmarks, and memory profilers.
+
+---
+
+### Standard CLI Installation & Commands
+
+#### 1. Install LogLens
 ```bash
 # Recommended via pipx
 pipx install loglens
