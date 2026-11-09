@@ -54,3 +54,7 @@ graphify-out/
 # Local environment & secrets
 .env
 .env.local
+
+# Documentation build and private launch drafts
+site/
+docs/launch/
