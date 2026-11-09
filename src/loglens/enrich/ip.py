@@ -33,3 +33,29 @@ def is_public_ip(ip_str: str) -> bool:
     """Check if an IP is a globally routable public IP."""
     info = classify_ip(ip_str)
     return bool(info.get("is_valid") and info.get("is_global"))
+
+
+def lookup_geoip(
+    ip_str: str,
+    mmdb_path: str | None = None,
+) -> dict[str, Any] | None:
+    """Perform optional GeoIP enrichment using a local MaxMind GeoLite2 MMDB database.
+
+    Gracefully returns None if geoip2 library is not installed or database is not configured.
+    """
+    if not mmdb_path or not is_public_ip(ip_str):
+        return None
+
+    try:
+        import geoip2.database  # type: ignore[import-untyped,import-not-found]
+
+        with geoip2.database.Reader(mmdb_path) as reader:
+            response = reader.city(ip_str.strip())
+            return {
+                "country_code": response.country.iso_code,
+                "country_name": response.country.name,
+                "city": response.city.name,
+            }
+    except Exception:
+        return None
+

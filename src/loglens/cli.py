@@ -25,6 +25,7 @@ from loglens.llm.prompts.loader import format_cluster_for_llm
 from loglens.models import Event, Finding, Report, ReportMetadata
 from loglens.notify import get_notifier
 from loglens.parsers import Parser, registry
+from loglens.plugins import load_plugins
 from loglens.redact import Redactor
 from loglens.report import (
     generate_html_report,
@@ -32,6 +33,7 @@ from loglens.report import (
     generate_markdown_report,
 )
 from loglens.rules import (
+    Rule,
     RuleEngine,
     get_builtin_rules,
     load_rule_from_file,
@@ -39,6 +41,9 @@ from loglens.rules import (
 )
 from loglens.store import StorageManager
 from loglens.watch import WatchMonitor
+
+# Auto-discover installed entry point plugins
+load_plugins()
 
 app = typer.Typer(
     name="loglens",
@@ -56,8 +61,14 @@ providers_app = typer.Typer(
     help="Inspect and verify LLM triage provider connectivity.",
     no_args_is_help=True,
 )
+plugins_app = typer.Typer(
+    name="plugins",
+    help="Discover and inspect installed LogLens plugins.",
+    no_args_is_help=True,
+)
 app.add_typer(rules_app, name="rules")
 app.add_typer(providers_app, name="providers")
+app.add_typer(plugins_app, name="plugins")
 
 console = Console()
 
@@ -873,6 +884,162 @@ def rules_test_command(
         console.print(
             f"[yellow]NO MATCH:[/yellow] '{rule.id}' did not trigger on {against} ({len(events)} events analyzed)."
         )
+
+
+@rules_app.command(name="import-sigma")
+def rules_import_sigma_command(
+    source_path: Annotated[
+        str,
+        typer.Argument(help="Path to Sigma rule file or directory of Sigma rules."),
+    ],
+    out: Annotated[
+        Path | None,
+        typer.Option(
+            "--out",
+            "-o",
+            help="Directory where converted LogLens rules will be saved.",
+        ),
+    ] = None,
+) -> None:
+    """Import and convert Sigma YAML detection rules into LogLens rules."""
+    import yaml
+
+    from loglens.rules.sigma import import_sigma_directory, import_sigma_file
+
+    p = Path(source_path)
+    if not p.exists():
+        console.print(f"[bold red]Error:[/bold red] Path does not exist: {source_path}")
+        raise typer.Exit(code=1)
+
+    converted_rules: list[Rule] = []
+    if p.is_file():
+        try:
+            converted_rules.append(import_sigma_file(p))
+        except Exception as e:
+            console.print(f"[bold red]Failed to import Sigma rule:[/bold red] {e}")
+            raise typer.Exit(code=1) from e
+    else:
+        converted_rules = import_sigma_directory(p)
+
+    if not converted_rules:
+        console.print("[yellow]No valid Sigma rules found to convert.[/yellow]")
+        return
+
+    console.print(
+        f"[bold green]Successfully converted {len(converted_rules)} Sigma rule(s):[/bold green]"
+    )
+    for r in converted_rules:
+        console.print(
+            f"  • [cyan]{r.id}[/cyan] ({r.title}) -> Severity: [bold]{r.severity.upper()}[/bold]"
+        )
+        if out:
+            out.mkdir(parents=True, exist_ok=True)
+            target_file = out / f"{r.id}.yml"
+            target_file.write_text(
+                yaml.safe_dump(r.model_dump(mode="json"), sort_keys=False),
+                encoding="utf-8",
+            )
+
+    if out:
+        console.print(f"\n[bold green]Saved {len(converted_rules)} rule(s) to:[/bold green] {out}")
+
+
+@plugins_app.command(name="list")
+def plugins_list_command() -> None:
+    """List third-party plugins discovered via Python entry points."""
+    from loglens.plugins import list_installed_plugins
+
+    plugins = list_installed_plugins()
+    if not plugins:
+        console.print("[dim]No third-party plugins currently installed.[/dim]")
+        console.print(
+            "To author a plugin, register entry points under 'loglens.parsers', 'loglens.rules', or 'loglens.notifiers'."
+        )
+        return
+
+    table = Table(title="Installed LogLens Plugins", show_header=True, header_style="bold cyan")
+    table.add_column("Plugin Name", style="bold green")
+    table.add_column("Group", style="cyan")
+    table.add_column("Entry Target", style="dim")
+    for p in plugins:
+        table.add_row(p["name"], p["group"], p["value"])
+    console.print(table)
+
+
+@app.command(name="export-actions")
+def export_actions_command(
+    report_file: Annotated[
+        str,
+        typer.Argument(help="Path to saved LogLens JSON report file or run ID from SQLite store."),
+    ],
+    target: Annotated[
+        str,
+        typer.Option(
+            "--target",
+            "-t",
+            help="Firewall/mitigation target format: nftables, iptables, cloudflare, fail2ban.",
+        ),
+    ] = "nftables",
+    min_severity: Annotated[
+        str,
+        typer.Option(
+            "--min-severity",
+            help="Minimum severity threshold for extracting offending IPs (critical, high, medium).",
+        ),
+    ] = "high",
+    out: Annotated[
+        Path | None,
+        typer.Option(
+            "--out",
+            "-o",
+            help="Output file path. If omitted, prints to standard output.",
+        ),
+    ] = None,
+) -> None:
+    """Generate advisory firewall mitigation scripts (generate-only, never auto-applied)."""
+    from loglens.actions import generate_action_export
+
+    target_clean = target.lower().strip()
+    if target_clean not in ("nftables", "iptables", "cloudflare", "fail2ban"):
+        console.print(
+            f"[bold red]Unsupported format:[/bold red] '{target}'. "
+            "Supported targets: nftables, iptables, cloudflare, fail2ban."
+        )
+        raise typer.Exit(code=1)
+
+    rep_path = Path(report_file)
+    report: Report | None = None
+
+    if rep_path.is_file():
+        try:
+            report = Report.model_validate_json(rep_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            console.print(f"[bold red]Failed to parse report file:[/bold red] {e}")
+            raise typer.Exit(code=1) from e
+    else:
+        # Check SQLite store by run_id
+        storage = StorageManager()
+        report = storage.get_run(report_file)
+        storage.close()
+
+    if report is None:
+        console.print(f"[bold red]Report not found:[/bold red] {report_file}")
+        raise typer.Exit(code=1)
+
+    output_script = generate_action_export(
+        report=report,
+        target=target_clean,  # type: ignore[arg-type]
+        min_severity=min_severity,
+    )
+
+    if out:
+        out.write_text(output_script, encoding="utf-8")
+        console.print(
+            f"[bold green]Successfully exported {target_clean} actions to:[/bold green] {out}\n"
+            f"[dim]Offending IPs extracted from findings with severity >= {min_severity}[/dim]"
+        )
+    else:
+        console.print(output_script)
 
 
 @app.command()

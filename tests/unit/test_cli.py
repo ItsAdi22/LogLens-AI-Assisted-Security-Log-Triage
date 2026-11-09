@@ -206,3 +206,28 @@ def test_cli_serve_help(cli_runner: CliRunner) -> None:
     assert "--db" in result.output
     assert "--token" in result.output
     assert "--provider" in result.output
+
+
+def test_cli_plugins_list(cli_runner: CliRunner) -> None:
+    """Verify `loglens plugins list` command executes cleanly."""
+    result = cli_runner.invoke(app, ["plugins", "list"])
+    assert result.exit_code == 0
+
+
+def test_cli_rules_import_sigma(cli_runner: CliRunner, tmp_path: Path) -> None:
+    """Verify `loglens rules import-sigma` converts Sigma YAML file."""
+    sigma_file = tmp_path / "test_sigma.yml"
+    sigma_file.write_text(
+        "title: Suspicious Curl Download\nid: curl-dl-01\nlevel: high\n"
+        "detection:\n  selection:\n    message|contains: 'curl http://'\n  condition: selection\n",
+        encoding="utf-8",
+    )
+    out_dir = tmp_path / "converted_rules"
+
+    result = cli_runner.invoke(
+        app,
+        ["rules", "import-sigma", str(sigma_file), "--out", str(out_dir)],
+    )
+    assert result.exit_code == 0
+    assert "Successfully converted 1 Sigma rule(s)" in result.output
+    assert (out_dir / "sigma-curl-dl-01.yml").exists()

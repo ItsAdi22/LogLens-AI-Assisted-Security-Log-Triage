@@ -65,3 +65,4 @@ The web service also exposes clean JSON endpoints for programmatic integration:
 | `/api/stats` | `GET` | Global summary telemetry and severity count breakdown. |
 | `/api/runs` | `GET` | Historical list of all ingestion runs sorted descending. |
 | `/api/runs/{run_id}` | `GET` | Full JSON export of the specified triage report. |
+

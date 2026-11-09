@@ -506,11 +506,11 @@ A thin **vertical slice** (analyze auth.log → rules → LLM → markdown repor
 
 ### Phase 7 — Ecosystem (2–3 weeks)
 
-- [ ] Parsers: Pterodactyl/Pelican panel, Minecraft server logs (login spam, exploit attempts like Log4Shell strings), fail2ban, ufw/iptables, Postgres/MySQL auth, Docker JSON logs
-- [ ] Sigma rule import (subset)
-- [ ] Plugin system via entry points (`loglens.parsers`, `loglens.rules`, `loglens.notifiers`)
-- [ ] Optional MaxMind GeoLite2 enrichment
-- [ ] Optional suggested-action export (ban list for nftables/Cloudflare) — **generate only, never auto-apply**
+- [x] Parsers: Pterodactyl/Pelican panel, Minecraft server logs (login spam, exploit attempts like Log4Shell strings), fail2ban, ufw/iptables, Postgres/MySQL auth, Docker JSON logs
+- [x] Sigma rule import (subset)
+- [x] Plugin system via entry points (`loglens.parsers`, `loglens.rules`, `loglens.notifiers`)
+- [x] Optional MaxMind GeoLite2 enrichment
+- [x] Optional suggested-action export (ban list for nftables/Cloudflare) — **generate only, never auto-apply**
 
 ### Phase 8 — Hardening & v1.0 (2–3 weeks)
 

@@ -10,6 +10,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Phase 7: Ecosystem, Sigma Importer & Extensibility**:
+  - Specialized built-in ecosystem parsers:
+    - `Fail2banParser` (`src/loglens/parsers/fail2ban.py`): Ingests `/var/log/fail2ban.log` tracking jail actions, ban enforcement, and unban lifecycle.
+    - `UfwParser` (`src/loglens/parsers/ufw.py`): Ingests UFW and Linux iptables kernel packet drop logs (`/var/log/ufw.log`).
+    - `DatabaseAuthParser` (`src/loglens/parsers/database_auth.py`): Ingests PostgreSQL and MySQL/MariaDB failed logins and unauthorized connection attempts.
+    - `MinecraftParser` (`src/loglens/parsers/minecraft.py`): Ingests Minecraft server console logs (`logs/latest.log`) with automatic detection of connection spam, RCON failures, and Log4Shell (`${jndi:...}`) exploit attempts.
+    - `PterodactylParser` (`src/loglens/parsers/pterodactyl.py`): Ingests Pterodactyl Wings and Pelican daemon logs (`wings.log`) capturing token authentication failures.
+    - `DockerJsonParser` (`src/loglens/parsers/docker_json.py`): Ingests container JSON log lines (`*-json.log`).
+  - Sigma rule importer (`src/loglens/rules/sigma.py`): Converts open-source Sigma YAML detection rules into LogLens native rules.
+  - CLI command `loglens rules import-sigma <path> [--out <dir>]`.
+  - Python entry point plugin architecture (`src/loglens/plugins/`): Discovers and loads custom third-party extensions for `loglens.parsers`, `loglens.rules`, and `loglens.notifiers`.
+  - CLI command `loglens plugins list`.
+  - Suggested-action perimeter mitigation export (`src/loglens/actions/`): Extracts verified offending source IPs and generates advisory configuration scripts for `nftables`, `iptables`, `fail2ban`, and `cloudflare` (strictly generate-only, never automatically applied).
+  - CLI command `loglens export-actions <report> --target nftables|iptables|fail2ban|cloudflare [--out file]`.
+  - Optional GeoIP enrichment (`lookup_geoip`) with graceful fallback.
+  - Comprehensive documentation: `docs/ecosystem.md`.
 - **Phase 6: Web UI & Timeline Inspection**:
   - Web dashboard package (`src/loglens/web/`) built using FastAPI, Jinja2, and vendored HTMX (zero Node/npm build steps).
   - 100% offline, self-hosted frontend with vendored HTMX (`/static/js/htmx.min.js`).

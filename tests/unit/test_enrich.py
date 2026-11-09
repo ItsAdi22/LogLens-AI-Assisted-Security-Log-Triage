@@ -1,6 +1,6 @@
 """Unit tests for IP and User-Agent enrichment modules."""
 
-from loglens.enrich.ip import classify_ip, is_public_ip
+from loglens.enrich.ip import classify_ip, is_public_ip, lookup_geoip
 from loglens.enrich.useragent import classify_user_agent, is_scanner_user_agent
 
 
@@ -63,3 +63,11 @@ def test_classify_user_agent_browser_and_empty() -> None:
     empty_res = classify_user_agent("-")
     assert empty_res["is_empty"] is True
     assert empty_res["category"] == "empty"
+
+
+def test_lookup_geoip_graceful_fallback() -> None:
+    """Verify lookup_geoip gracefully returns None when database is not configured."""
+    assert lookup_geoip("198.51.100.22", mmdb_path=None) is None
+    assert lookup_geoip("192.168.1.1", mmdb_path="fake.mmdb") is None
+    assert lookup_geoip("198.51.100.22", mmdb_path="nonexistent.mmdb") is None
+

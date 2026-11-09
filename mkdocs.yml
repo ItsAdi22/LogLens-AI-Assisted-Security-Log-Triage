@@ -30,6 +30,7 @@ nav:
   - Quickstart: quickstart.md
   - Architecture: architecture.md
   - Web Dashboard: web-ui.md
+  - Ecosystem & Plugins: ecosystem.md
   - Threat Model: threat-model.md
   - Privacy & Redaction: privacy-and-redaction.md
   - LLM Providers: llm-providers.md

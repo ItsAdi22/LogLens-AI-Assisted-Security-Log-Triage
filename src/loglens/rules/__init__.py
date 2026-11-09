@@ -8,6 +8,11 @@ from loglens.rules.engine import (
     load_rules_from_directory,
 )
 from loglens.rules.schema import Rule, RuleCondition, RuleMatch
+from loglens.rules.sigma import (
+    convert_sigma_dict_to_rule,
+    import_sigma_directory,
+    import_sigma_file,
+)
 
 # Path to shipped built-in rules
 BUILTIN_RULES_DIR = Path(__file__).resolve().parent.parent.parent.parent / "rules" / "builtin"
@@ -24,7 +29,10 @@ __all__ = [
     "RuleCondition",
     "RuleEngine",
     "RuleMatch",
+    "convert_sigma_dict_to_rule",
     "get_builtin_rules",
+    "import_sigma_directory",
+    "import_sigma_file",
     "load_rule_from_file",
     "load_rules_from_directory",
 ]
