@@ -35,7 +35,9 @@ class LocalVault:
                 raw_key = path.read_bytes().strip()
                 return Fernet(raw_key)
             except Exception as e:
-                logger.warning("Failed to read existing vault key at %s (%s). Re-generating key.", path, e)
+                logger.warning(
+                    "Failed to read existing vault key at %s (%s). Re-generating key.", path, e
+                )
 
         path.parent.mkdir(parents=True, exist_ok=True)
         key = Fernet.generate_key()

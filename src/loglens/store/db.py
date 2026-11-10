@@ -293,8 +293,12 @@ class StorageManager:
             "updated_at": str(row["updated_at"]),
         }
         if decrypt:
-            result["password"] = self._vault.decrypt(row["encrypted_password"]) if row["encrypted_password"] else ""
-            result["key_content"] = self._vault.decrypt(row["encrypted_key"]) if row["encrypted_key"] else ""
+            result["password"] = (
+                self._vault.decrypt(row["encrypted_password"]) if row["encrypted_password"] else ""
+            )
+            result["key_content"] = (
+                self._vault.decrypt(row["encrypted_key"]) if row["encrypted_key"] else ""
+            )
 
         return result
 

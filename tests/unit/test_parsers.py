@@ -312,4 +312,3 @@ def test_auth_log_parser_extracts_pam_cron_systemd() -> None:
     assert ev_logind.fields["service"] == "systemd-logind"
     assert ev_logind.fields["action"] == "new_session"
     assert ev_logind.fields["session_id"] == "55"
-

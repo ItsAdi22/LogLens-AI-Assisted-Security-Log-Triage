@@ -63,7 +63,26 @@ class AdaptiveMultiParser(Parser):
         if " | " in clean:
             parts = clean.split(" | ", 1)
             # If the right side looks like a timestamped log line, try both
-            if parts[1].startswith(("[", "20", "19", "{", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")):
+            if parts[1].startswith(
+                (
+                    "[",
+                    "20",
+                    "19",
+                    "{",
+                    "Jan",
+                    "Feb",
+                    "Mar",
+                    "Apr",
+                    "May",
+                    "Jun",
+                    "Jul",
+                    "Aug",
+                    "Sep",
+                    "Oct",
+                    "Nov",
+                    "Dec",
+                )
+            ):
                 stripped_line = parts[1]
 
         parsers = self._get_parsers()
@@ -75,7 +94,9 @@ class AdaptiveMultiParser(Parser):
                 if ev is not None:
                     return ev
                 if stripped_line != clean:
-                    ev_stripped = p.parse_line(stripped_line, line_number, reference_dt=reference_dt)
+                    ev_stripped = p.parse_line(
+                        stripped_line, line_number, reference_dt=reference_dt
+                    )
                     if ev_stripped is not None:
                         return ev_stripped
             except Exception:

@@ -91,4 +91,3 @@ def test_drain3_preprocessing_regression_no_timestamp() -> None:
     assert "+05:30" not in template
     assert "mpanel" not in template
     assert "pam_unix(systemd-user:session): session opened for user root" in template
-

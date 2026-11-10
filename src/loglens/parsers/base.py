@@ -110,7 +110,11 @@ def extract_common_system_fields(msg: str, fields: dict[str, Any]) -> None:
             fields.setdefault("preauth", True)
         else:
             fields.setdefault("action", "connection_closed")
-        u = m_ssh_reset.group("inv_user") or m_ssh_reset.group("auth_user") or m_ssh_reset.group("norm_user")
+        u = (
+            m_ssh_reset.group("inv_user")
+            or m_ssh_reset.group("auth_user")
+            or m_ssh_reset.group("norm_user")
+        )
         if u:
             fields.setdefault("user", u)
         if m_ssh_reset.group("inv_user") or "invalid user" in msg.lower():

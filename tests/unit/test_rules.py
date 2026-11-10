@@ -237,9 +237,27 @@ def test_benign_rules_cron_systemd_pam() -> None:
         raw_hash="hash_pam",
     )
     clusters = [
-        Cluster(id="c-cron", template="CRON[<*>]: (root) CMD (<*>)", count=1, first_seen=now, last_seen=now),
-        Cluster(id="c-logind", template="systemd-logind[<*>]: New session <*> of user root.", count=1, first_seen=now, last_seen=now),
-        Cluster(id="c-pam", template="pam_unix(systemd-user:session): session opened for user root", count=1, first_seen=now, last_seen=now),
+        Cluster(
+            id="c-cron",
+            template="CRON[<*>]: (root) CMD (<*>)",
+            count=1,
+            first_seen=now,
+            last_seen=now,
+        ),
+        Cluster(
+            id="c-logind",
+            template="systemd-logind[<*>]: New session <*> of user root.",
+            count=1,
+            first_seen=now,
+            last_seen=now,
+        ),
+        Cluster(
+            id="c-pam",
+            template="pam_unix(systemd-user:session): session opened for user root",
+            count=1,
+            first_seen=now,
+            last_seen=now,
+        ),
     ]
 
     findings = engine.evaluate([ev_cron, ev_logind, ev_pam], clusters)
@@ -265,4 +283,3 @@ def test_rule_remediation_lookup() -> None:
 
     desc = get_rule_description(["ssh-invalid-user"])
     assert "username" in desc.lower()
-

@@ -52,7 +52,11 @@ def test_build_unified_stream_command() -> None:
 
 
 def test_build_unified_stream_command_fallback() -> None:
-    empty_discovered: dict[str, list[str]] = {"files": [], "docker_containers": [], "compose_dirs": []}
+    empty_discovered: dict[str, list[str]] = {
+        "files": [],
+        "docker_containers": [],
+        "compose_dirs": [],
+    }
     fallback_cmd = build_unified_stream_command(empty_discovered)
     assert "tail -q -n 30 -F" in fallback_cmd
     assert "/var/log/auth.log" in fallback_cmd

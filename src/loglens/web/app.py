@@ -631,7 +631,9 @@ def create_app(
             "linux-auth": "tail -n 50 -F /var/log/auth.log 2>/dev/null || tail -n 50 -F /var/log/secure",
             "custom": custom_cmd.strip(),
         }
-        chosen_cmd = cmd_map.get(preset, "auto" if preset == "smart-auto" else custom_cmd.strip() or "auto")
+        chosen_cmd = cmd_map.get(
+            preset, "auto" if preset == "smart-auto" else custom_cmd.strip() or "auto"
+        )
         source_label = f"ssh://{clean_user}@{clean_host} ({preset})"
 
         key_path = None
@@ -668,7 +670,9 @@ def create_app(
             return Response(headers={"HX-Redirect": "/live"})
         return RedirectResponse(url="/live", status_code=status.HTTP_303_SEE_OTHER)
 
-    @app.post("/api/live/ssh/test", response_class=HTMLResponse, dependencies=[Depends(verify_token)])
+    @app.post(
+        "/api/live/ssh/test", response_class=HTMLResponse, dependencies=[Depends(verify_token)]
+    )
     def live_ssh_test(
         host: str = Form(""),
         port: int = Form(22),
@@ -723,12 +727,12 @@ def create_app(
         if diag["success"]:
             return HTMLResponse(
                 f'<div style="padding: 8px 12px; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); border-radius: 4px; color: #34d399; font-size: 11px; font-family: var(--font-mono);">'
-                f'✓ {html.escape(diag["message"])}'
+                f"✓ {html.escape(diag['message'])}"
                 "</div>"
             )
         return HTMLResponse(
             f'<div style="padding: 8px 12px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); border-radius: 4px; color: #f87171; font-size: 11px; font-family: var(--font-mono);">'
-            f'✗ {html.escape(diag["message"])}'
+            f"✗ {html.escape(diag['message'])}"
             "</div>"
         )
 
@@ -967,14 +971,10 @@ def create_app(
             delivered = notifier.send_digest(report.findings, report.metadata)
             if delivered:
                 msg = f"✓ Run digest dispatched to {channel.capitalize()}!"
-                return HTMLResponse(
-                    f'<span class="alert-status-badge alert-success">{msg}</span>'
-                )
+                return HTMLResponse(f'<span class="alert-status-badge alert-success">{msg}</span>')
             else:
                 msg = f"✗ Failed sending to {channel.capitalize()} (unconfigured or rejected)."
-                return HTMLResponse(
-                    f'<span class="alert-status-badge alert-error">{msg}</span>'
-                )
+                return HTMLResponse(f'<span class="alert-status-badge alert-error">{msg}</span>')
         except Exception as exc:
             return HTMLResponse(
                 f'<span class="alert-status-badge alert-error">Error: {html.escape(str(exc))}</span>'
@@ -1008,14 +1008,10 @@ def create_app(
             delivered = notifier.send_alert(target_finding, report.metadata)
             if delivered:
                 msg = f"✓ Finding alert delivered to {channel.capitalize()}!"
-                return HTMLResponse(
-                    f'<span class="alert-status-badge alert-success">{msg}</span>'
-                )
+                return HTMLResponse(f'<span class="alert-status-badge alert-success">{msg}</span>')
             else:
                 msg = f"✗ Delivery to {channel.capitalize()} failed. Check settings."
-                return HTMLResponse(
-                    f'<span class="alert-status-badge alert-error">{msg}</span>'
-                )
+                return HTMLResponse(f'<span class="alert-status-badge alert-error">{msg}</span>')
         except Exception as exc:
             return HTMLResponse(
                 f'<span class="alert-status-badge alert-error">Error: {html.escape(str(exc))}</span>'
@@ -1065,14 +1061,10 @@ def create_app(
             delivered = notifier.send_alert(synthetic_finding, report.metadata)
             if delivered:
                 msg = f"✓ Error alert sent to {channel.capitalize()}!"
-                return HTMLResponse(
-                    f'<span class="alert-status-badge alert-success">{msg}</span>'
-                )
+                return HTMLResponse(f'<span class="alert-status-badge alert-success">{msg}</span>')
             else:
                 msg = f"✗ Delivery to {channel.capitalize()} failed."
-                return HTMLResponse(
-                    f'<span class="alert-status-badge alert-error">{msg}</span>'
-                )
+                return HTMLResponse(f'<span class="alert-status-badge alert-error">{msg}</span>')
         except Exception as exc:
             return HTMLResponse(
                 f'<span class="alert-status-badge alert-error">Error: {html.escape(str(exc))}</span>'

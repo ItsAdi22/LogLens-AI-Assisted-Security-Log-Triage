@@ -974,7 +974,3 @@ def test_run_detail_security_events_and_noise_separation(tmp_path: Path) -> None
 
     # 4. Deduped sample excerpt: since c_err sample_message == template, "Sample excerpt" should NOT appear for it
     assert "Sample excerpt" not in res.text
-
-
-
-

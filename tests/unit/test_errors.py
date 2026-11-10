@@ -88,7 +88,9 @@ def test_classify_cluster_error_sshd_never_misclassified_as_network_outage() -> 
         count=10,
         first_seen=datetime.now(UTC),
         last_seen=datetime.now(UTC),
-        sample_messages=["Connection reset by invalid user root 222.167.207.101 port 52342 [preauth]"],
+        sample_messages=[
+            "Connection reset by invalid user root 222.167.207.101 port 52342 [preauth]"
+        ],
     )
     # Must return None so it never reaches application errors
     assert classify_cluster_error(c) is None

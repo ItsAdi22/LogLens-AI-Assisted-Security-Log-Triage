@@ -54,7 +54,10 @@ class AuthLogParser:
         auth_matches = 0
         for line in sample_lines:
             if (
-                any(k in line for k in ("sshd[", "sudo:", "pam_unix", "sshd:", "su:", "systemd-logind"))
+                any(
+                    k in line
+                    for k in ("sshd[", "sudo:", "pam_unix", "sshd:", "su:", "systemd-logind")
+                )
                 or "Failed password" in line
                 or "Accepted publickey" in line
                 or "Accepted password" in line

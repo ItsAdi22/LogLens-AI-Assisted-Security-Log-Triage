@@ -218,25 +218,25 @@ def discover_remote_sources(client: Any) -> dict[str, list[str]]:
     """Inspect remote Linux VPS to discover available log files, docker containers, and compose directories."""
     probe_script = (
         "sh -c '\n"
-        "echo \"===FILES===\"\n"
+        'echo "===FILES==="\n'
         "for f in "
         "/var/log/auth.log /var/log/secure /var/log/syslog /var/log/messages "
         "/usr/local/lsws/logs/access.log /usr/local/lsws/logs/error.log /usr/local/lsws/logs/stderr.log "
         "/var/log/nginx/access.log /var/log/nginx/error.log "
         "/var/log/apache2/access.log /var/log/apache2/error.log "
         "/var/log/httpd/access_log /var/log/httpd/error_log; do\n"
-        "  if [ -f \"$f\" ]; then echo \"$f\"; fi\n"
+        '  if [ -f "$f" ]; then echo "$f"; fi\n'
         "done\n"
         "for h in /home/*/logs/*.access_log /home/*/logs/*.error_log; do\n"
-        "  if [ -f \"$h\" ]; then echo \"$h\"; fi\n"
+        '  if [ -f "$h" ]; then echo "$h"; fi\n'
         "done\n"
-        "echo \"===DOCKER===\"\n"
+        'echo "===DOCKER==="\n'
         "if command -v docker >/dev/null 2>&1; then\n"
-        "  docker ps --format \"{{.Names}}\" 2>/dev/null\n"
+        '  docker ps --format "{{.Names}}" 2>/dev/null\n'
         "fi\n"
-        "echo \"===COMPOSE===\"\n"
+        'echo "===COMPOSE==="\n'
         "for d in ~/pelican-panel /root/pelican-panel /var/www/pelican /var/www/pterodactyl; do\n"
-        "  if [ -d \"$d\" ]; then echo \"$d\"; fi\n"
+        '  if [ -d "$d" ]; then echo "$d"; fi\n'
         "done\n"
         "'"
     )
@@ -327,7 +327,9 @@ def build_unified_stream_command(discovered: dict[str, list[str]]) -> str:
         files_str = " ".join(files)
         commands.append(f"tail -q -n 30 -F {files_str} 2>/dev/null")
     else:
-        commands.append("tail -q -n 30 -F /var/log/auth.log /var/log/secure /var/log/syslog 2>/dev/null")
+        commands.append(
+            "tail -q -n 30 -F /var/log/auth.log /var/log/secure /var/log/syslog 2>/dev/null"
+        )
 
     if containers:
         for c in containers[:4]:
@@ -340,13 +342,7 @@ def build_unified_stream_command(discovered: dict[str, list[str]]) -> str:
         return commands[0]
 
     sub_cmds = " & \n".join(f"({cmd})" for cmd in commands)
-    return (
-        "sh -c '\n"
-        "trap \"kill 0\" EXIT TERM INT\n"
-        f"{sub_cmds} &\n"
-        "wait\n"
-        "'"
-    )
+    return f"sh -c '\ntrap \"kill 0\" EXIT TERM INT\n{sub_cmds} &\nwait\n'"
 
 
 class LiveSSHMonitor(WatchMonitor):
@@ -487,7 +483,11 @@ class LiveSSHMonitor(WatchMonitor):
                     last_flush = now
 
                     if not self.parser:
-                        self.parser = registry.get("adaptive") or registry.autodetect(lines_to_process[:20]) or registry.get("generic")
+                        self.parser = (
+                            registry.get("adaptive")
+                            or registry.autodetect(lines_to_process[:20])
+                            or registry.get("generic")
+                        )
                     p_active = self.parser or registry.get("generic")
 
                     if p_active is not None:
@@ -522,8 +522,13 @@ class LiveSSHMonitor(WatchMonitor):
             if channel.exit_status_ready():
                 exit_code = channel.recv_exit_status()
                 if exit_code != 0:
-                    err_msg = " ".join(recent_output[-3:]).strip() or f"Process exited with code {exit_code}"
-                    raise RuntimeError(f"Remote command failed (exit code {exit_code}): {err_msg[:200]}")
+                    err_msg = (
+                        " ".join(recent_output[-3:]).strip()
+                        or f"Process exited with code {exit_code}"
+                    )
+                    raise RuntimeError(
+                        f"Remote command failed (exit code {exit_code}): {err_msg[:200]}"
+                    )
 
         finally:
             with contextlib.suppress(Exception):

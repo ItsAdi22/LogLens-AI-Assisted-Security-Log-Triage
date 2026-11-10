@@ -1,7 +1,7 @@
 # LogLens — AI-Assisted Security Log Triage
 
 [![CI](https://github.com/ItsAdi22/LogLens-AI-Assisted-Security-Log-Triage/actions/workflows/ci.yml/badge.svg)](https://github.com/ItsAdi22/LogLens-AI-Assisted-Security-Log-Triage/actions/workflows/ci.yml)
-[![Release](https://github.com/ItsAdi22/LogLens-AI-Assisted-Security-Log-Triage/actions/workflows/release.yml/badge.svg)](https://github.com/ItsAdi22/LogLens-AI-Assisted-Security-Log-Triage/actions/workflows/release.yml)
+[![Release](https://img.shields.io/github/v/release/ItsAdi22/LogLens-AI-Assisted-Security-Log-Triage?color=blue)](https://github.com/ItsAdi22/LogLens-AI-Assisted-Security-Log-Triage/releases)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)](pyproject.toml)
 [![CodeQL](https://github.com/ItsAdi22/LogLens-AI-Assisted-Security-Log-Triage/actions/workflows/codeql.yml/badge.svg)](https://github.com/ItsAdi22/LogLens-AI-Assisted-Security-Log-Triage/actions/workflows/codeql.yml)
