@@ -303,9 +303,15 @@ def create_app(
                         text_content = resp.text
                         source_name = f"pelican://{panel_server_id.strip()}/{target_file}"
                     else:
+                        extra_hint = ""
+                        if resp.status_code in (401, 403) and (
+                            panel_api_key.strip().startswith("papp_")
+                            or panel_api_key.strip().startswith("ptla_")
+                        ):
+                            extra_hint = " Note: You provided an Admin Application API key ('papp_...'). To read server files, you must use a Client API key created under Account Settings -> API Credentials."
                         raise HTTPException(
                             status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"Panel API returned HTTP {resp.status_code}: {resp.text[:200]}",
+                            detail=f"Panel API returned HTTP {resp.status_code}: {resp.text[:200]}.{extra_hint}",
                         )
             except HTTPException:
                 raise

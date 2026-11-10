@@ -65,7 +65,10 @@
             <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">
               Client API key
             </label>
-            <input type="password" name="panel_api_key" placeholder="ptlc_... or pelican_..." style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+            <input type="password" name="panel_api_key" placeholder="Client key from Account Settings" style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 3px;">
+              Create in <strong>Account &rarr; API Credentials</strong> (not Admin Area)
+            </div>
           </div>
         </div>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px;">
@@ -73,7 +76,10 @@
             <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">
               Server identifier / UUID
             </label>
-            <input type="text" name="panel_server_id" placeholder="8-character short id or full UUID" style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+            <input type="text" name="panel_server_id" placeholder="e.g. 8a3b5c1d or full UUID" style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 3px;">
+              Found in server URL: <code>/server/&lt;id&gt;</code>
+            </div>
           </div>
           <div>
             <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">
