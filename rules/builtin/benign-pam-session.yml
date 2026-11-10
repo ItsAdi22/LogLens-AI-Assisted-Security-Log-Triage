@@ -1,0 +1,17 @@
+id: benign-pam-session
+title: Benign PAM Unix Session Lifecycle
+description: Standard PAM session open or close for authenticated users or service transitions.
+source:
+  - auth
+  - pam
+  - syslog
+match:
+  field_regex:
+    action: "^session_(?:opened|closed)$"
+severity: info
+tags:
+  - benign
+  - noise
+  - system.pam
+false_positives:
+  - Legitimate user logins, sudo transitions, and automated system services

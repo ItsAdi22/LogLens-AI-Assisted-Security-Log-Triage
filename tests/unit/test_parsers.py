@@ -263,3 +263,53 @@ def test_autodetect_registry() -> None:
     ]
     detected_json = registry.autodetect(json_samples)
     assert detected_json.name == "json"
+
+
+def test_auth_log_parser_connection_reset_preauth() -> None:
+    """Verify sshd preauth reset lines are autodetected and parsed with extracted fields."""
+    sample = ["Connection reset by invalid user root 222.167.207.101 port 52342 [preauth]"]
+    detected = registry.autodetect(sample)
+    assert detected.name == "auth"
+
+    parser = AuthLogParser()
+    event = parser.parse_line(sample[0], 1)
+    assert event is not None
+    assert event.fields["user"] == "root"
+    assert event.fields["ip"] == "222.167.207.101"
+    assert event.fields["port"] == 52342
+    assert event.fields["invalid_user"] is True
+    assert event.fields["action"] == "preauth_reset"
+    assert event.fields["service"] == "sshd"
+    assert event.severity_hint == "low"
+
+
+def test_auth_log_parser_extracts_pam_cron_systemd() -> None:
+    """Verify field extraction for pam_unix, cron, and systemd-logind."""
+    parser = AuthLogParser()
+
+    # 1. PAM unix session
+    pam_line = "pam_unix(systemd-user:session): session opened for user root(uid=0) by root(uid=0)"
+    ev_pam = parser.parse_line(pam_line, 1)
+    assert ev_pam is not None
+    assert ev_pam.fields["user"] == "root"
+    assert ev_pam.fields["service"] == "systemd-user"
+    assert ev_pam.fields["action"] == "session_opened"
+
+    # 2. Cron job
+    cron_line = "CRON[12345]: (root) CMD (/usr/local/bin/backup.sh)"
+    ev_cron = parser.parse_line(cron_line, 2)
+    assert ev_cron is not None
+    assert ev_cron.fields["user"] == "root"
+    assert ev_cron.fields["service"] == "cron"
+    assert ev_cron.fields["action"] == "cron_cmd"
+    assert ev_cron.fields["command"] == "/usr/local/bin/backup.sh"
+
+    # 3. systemd-logind
+    logind_line = "systemd-logind[888]: New session 55 of user mango."
+    ev_logind = parser.parse_line(logind_line, 3)
+    assert ev_logind is not None
+    assert ev_logind.fields["user"] == "mango"
+    assert ev_logind.fields["service"] == "systemd-logind"
+    assert ev_logind.fields["action"] == "new_session"
+    assert ev_logind.fields["session_id"] == "55"
+

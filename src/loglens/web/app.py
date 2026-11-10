@@ -37,6 +37,7 @@ from loglens.notify.base import SEVERITY_LEVELS
 from loglens.parsers import registry
 from loglens.redact import Redactor
 from loglens.rules import RuleEngine, get_builtin_rules
+from loglens.rules.remediation import get_rule_description, get_rule_remediation
 from loglens.store import DEFAULT_DB_PATH, StorageManager
 from loglens.watch import LiveWatchManager, test_ssh_connection
 
@@ -201,6 +202,8 @@ def create_app(
     # Jinja2 template rendering
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     templates.env.filters["ist"] = format_ist
+    templates.env.globals["get_rule_remediation"] = get_rule_remediation
+    templates.env.globals["get_rule_description"] = get_rule_description
 
     # Storage manager
     actual_db_path = db_path or os.environ.get("LOGLENS_DB_PATH") or DEFAULT_DB_PATH
@@ -851,12 +854,23 @@ def create_app(
 
         classified_errors = extract_classified_errors(report.clusters)
 
+        # Separate benign / noise findings from actionable security findings
+        def _is_noise(f: Finding) -> bool:
+            return any(r.startswith("benign-") for r in f.rule_ids) or (
+                f.rule_severity == "info" and any("session" in r or "cron" in r for r in f.rule_ids)
+            )
+
+        security_findings = [f for f in report.findings if not _is_noise(f)]
+        noise_findings = [f for f in report.findings if _is_noise(f)]
+
         return templates.TemplateResponse(
             request=request,
             name="run_detail.html",
             context={
                 "run_id": run_id,
                 "report": report,
+                "findings": security_findings,
+                "noise_findings": noise_findings,
                 "classified_errors": classified_errors,
             },
         )

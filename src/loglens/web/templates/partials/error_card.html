@@ -23,8 +23,8 @@
       {{ error.template|replace('<*>', '<span class="wildcard">&lt;*&gt;</span>')|safe }}
     </div>
 
-    <!-- Sample Log Message Preview -->
-    {% if error.sample_message %}
+    <!-- Sample Log Message Preview (only if distinct from template) -->
+    {% if error.sample_message and error.sample_message.strip() != error.template.strip() %}
       <div style="margin-bottom: 10px;">
         <div style="font-size: 11px; color: var(--text-muted); font-weight: 500; margin-bottom: 4px;">
           Sample excerpt

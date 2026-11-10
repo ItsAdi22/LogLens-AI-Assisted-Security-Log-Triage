@@ -80,6 +80,20 @@ def test_classify_cluster_error_benign_returns_none() -> None:
     assert classify_cluster_error(c) is None
 
 
+def test_classify_cluster_error_sshd_never_misclassified_as_network_outage() -> None:
+    """Verify sshd preauth reset lines are not classified as generic network/service outages."""
+    c = Cluster(
+        id="c-ssh-1",
+        template="Connection reset by invalid user root <*> port <*> [preauth]",
+        count=10,
+        first_seen=datetime.now(UTC),
+        last_seen=datetime.now(UTC),
+        sample_messages=["Connection reset by invalid user root 222.167.207.101 port 52342 [preauth]"],
+    )
+    # Must return None so it never reaches application errors
+    assert classify_cluster_error(c) is None
+
+
 def test_extract_classified_errors_sorted() -> None:
     c1 = Cluster(
         id="c-1",

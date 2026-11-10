@@ -1,0 +1,19 @@
+id: ssh-invalid-user
+title: SSH Invalid User Probe
+description: Single attempt to authenticate using a non-existent username, characteristic of automated network reconnaissance.
+source:
+  - sshd
+  - auth
+match:
+  field_matches:
+    invalid_user: true
+severity: low
+tags:
+  - attack.initial_access
+  - attack.t1087
+  - attack.t1087.001
+  - ssh_invalid_user_probe
+references:
+  - https://attack.mitre.org/techniques/T1087/001/
+false_positives:
+  - Legitimate user mistyping their username during initial SSH connection

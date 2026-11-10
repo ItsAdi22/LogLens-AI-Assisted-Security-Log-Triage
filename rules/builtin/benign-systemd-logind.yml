@@ -1,0 +1,17 @@
+id: benign-systemd-logind
+title: Benign systemd-logind Session Lifecycle
+description: Standard session creation, removal, or logout handled by systemd-logind.
+source:
+  - systemd-logind
+  - auth
+  - syslog
+match:
+  field_matches:
+    service: systemd-logind
+severity: info
+tags:
+  - benign
+  - noise
+  - system.logind
+false_positives:
+  - Normal interactive login and logout activity

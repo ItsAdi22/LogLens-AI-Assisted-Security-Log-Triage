@@ -64,3 +64,31 @@ def test_drain_clusterer_multiple_templates() -> None:
     templates = [c.template for c in clusters]
     assert any("Failed password" in t for t in templates)
     assert any("GET" in t for t in templates)
+
+
+def test_drain3_preprocessing_regression_no_timestamp() -> None:
+    """Regression test: verify ISO8601 timestamps and leading host/program prefix are stripped."""
+    clusterer = DrainClusterer()
+    raw = (
+        "2026-11-10T15:20:18.560675+05:30 mpanel (systemd): "
+        "pam_unix(systemd-user:session): session opened for user root(uid=0) by root(uid=0)"
+    )
+    ev = Event(
+        ts=datetime.now(UTC),
+        source="systemd",
+        host="mpanel",
+        severity_hint="info",
+        message=raw,
+        fields={},
+        raw_hash="reg_hash_01",
+    )
+    clusterer.add_event(ev)
+    clusters = clusterer.get_clusters()
+    assert len(clusters) == 1
+    template = clusters[0].template
+    assert "2026" not in template
+    assert "15:20:18" not in template
+    assert "+05:30" not in template
+    assert "mpanel" not in template
+    assert "pam_unix(systemd-user:session): session opened for user root" in template
+

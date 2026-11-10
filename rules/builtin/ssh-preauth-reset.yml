@@ -1,0 +1,18 @@
+id: ssh-preauth-reset
+title: SSH Preauth Connection Reset
+description: SSH connection was terminated or reset before completing the initial pre-authentication handshake.
+source:
+  - sshd
+  - auth
+match:
+  field_matches:
+    action: preauth_reset
+severity: low
+tags:
+  - attack.reconnaissance
+  - attack.initial_access
+  - attack.t1595
+references:
+  - https://attack.mitre.org/techniques/T1595/
+false_positives:
+  - Client closed connection before completing key exchange or connection dropped by network jitter

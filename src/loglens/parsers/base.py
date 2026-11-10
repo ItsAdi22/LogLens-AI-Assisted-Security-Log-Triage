@@ -1,10 +1,134 @@
 """Base abstractions, protocol, and registry for log parsers."""
 
+import contextlib
+import re
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import Protocol
+from typing import Any, Protocol
 
 from loglens.models import Event
+
+# Regex patterns for PAM, cron, systemd-logind, and SSH
+RE_PAM_SESSION = re.compile(
+    r"pam_unix\((?P<service>[^)]+)\):\s*session\s+(?P<action>opened|closed)\s+for\s+user\s+(?P<user>[a-zA-Z0-9_\-\.]+)(?:\(uid=[0-9]+\))?(?:\s+by\s+(?P<by_user>[a-zA-Z0-9_\-\.]+)?(?:\(uid=[0-9]+\))?)?",
+    re.IGNORECASE,
+)
+RE_PAM_FAILURE = re.compile(
+    r"pam_unix\((?P<service>[^)]+)\):\s*authentication failure;\s*(?P<details>.*)",
+    re.IGNORECASE,
+)
+RE_CRON_CMD = re.compile(
+    r"(?:CRON|cron)(?:\[(?P<pid>[0-9]+)\])?:\s*\((?P<user>[^)]+)\)\s*(?P<action>CMD|RELOAD)\s*\((?P<cmd>.*)\)",
+    re.IGNORECASE,
+)
+RE_SYSTEMD_LOGIND_NEW = re.compile(
+    r"systemd-logind(?:\[[0-9]+\])?:\s*New session\s+(?P<session>[^\s]+)\s+of\s+user\s+(?P<user>[a-zA-Z0-9_\-]+)\.?",
+    re.IGNORECASE,
+)
+RE_SYSTEMD_LOGIND_REMOVED = re.compile(
+    r"systemd-logind(?:\[[0-9]+\])?:\s*Removed session\s+(?P<session>[^\s\.]+)\.?",
+    re.IGNORECASE,
+)
+RE_SYSTEMD_LOGIND_LOGOUT = re.compile(
+    r"systemd-logind(?:\[[0-9]+\])?:\s*Session\s+(?P<session>[^\s]+)\s+logged out",
+    re.IGNORECASE,
+)
+RE_SSHD_RESET_CLOSED = re.compile(
+    r"Connection (?:closed|reset) by (?:invalid user\s+(?P<inv_user>[^\s]+)|authenticating user\s+(?P<auth_user>[^\s]+)|user\s+(?P<norm_user>[^\s]+))?\s*(?P<ip>[0-9a-fA-F\.:]+)\s+port\s+(?P<port>[0-9]+)(?:\s*\[preauth\])?",
+    re.IGNORECASE,
+)
+RE_GENERIC_IP = re.compile(r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b")
+RE_GENERIC_PORT = re.compile(r"\bport\s+([0-9]{1,5})\b", re.IGNORECASE)
+
+
+def extract_common_system_fields(msg: str, fields: dict[str, Any]) -> None:
+    """Extract standard entity fields (user, service, action, ip, port) from system messages."""
+    # 1. PAM unix sessions
+    m_pam_sess = RE_PAM_SESSION.search(msg)
+    if m_pam_sess:
+        raw_svc = m_pam_sess.group("service").split(":")[0]
+        fields.setdefault("service", raw_svc)
+        fields.setdefault("action", f"session_{m_pam_sess.group('action').lower()}")
+        fields.setdefault("user", m_pam_sess.group("user"))
+        if m_pam_sess.group("by_user"):
+            fields.setdefault("by_user", m_pam_sess.group("by_user"))
+
+    # 2. PAM unix failure
+    m_pam_fail = RE_PAM_FAILURE.search(msg)
+    if m_pam_fail:
+        raw_svc = m_pam_fail.group("service").split(":")[0]
+        fields.setdefault("service", raw_svc)
+        fields.setdefault("action", "auth_failure")
+        details = m_pam_fail.group("details")
+        rhost = re.search(r"rhost=([^\s;]+)", details)
+        ruser = re.search(r"ruser=([^\s;]+)", details)
+        usr = re.search(r"\buser=([^\s;]+)", details)
+        if rhost and rhost.group(1):
+            fields.setdefault("ip", rhost.group(1))
+        if ruser and ruser.group(1):
+            fields.setdefault("user", ruser.group(1))
+        elif usr and usr.group(1):
+            fields.setdefault("user", usr.group(1))
+
+    # 3. Cron jobs
+    m_cron = RE_CRON_CMD.search(msg)
+    if m_cron:
+        fields.setdefault("service", "cron")
+        act = "cron_cmd" if m_cron.group("action").upper() == "CMD" else "cron_reload"
+        fields.setdefault("action", act)
+        fields.setdefault("user", m_cron.group("user"))
+        fields.setdefault("command", m_cron.group("cmd"))
+        if m_cron.group("pid"):
+            fields.setdefault("pid", int(m_cron.group("pid")))
+
+    # 4. systemd-logind sessions
+    m_new = RE_SYSTEMD_LOGIND_NEW.search(msg)
+    if m_new:
+        fields.setdefault("service", "systemd-logind")
+        fields.setdefault("action", "new_session")
+        fields.setdefault("user", m_new.group("user").rstrip("."))
+        fields.setdefault("session_id", m_new.group("session"))
+
+    m_rem = RE_SYSTEMD_LOGIND_REMOVED.search(msg)
+    if m_rem:
+        fields.setdefault("service", "systemd-logind")
+        fields.setdefault("action", "removed_session")
+        fields.setdefault("session_id", m_rem.group("session"))
+
+    m_out = RE_SYSTEMD_LOGIND_LOGOUT.search(msg)
+    if m_out:
+        fields.setdefault("service", "systemd-logind")
+        fields.setdefault("action", "session_logout")
+        fields.setdefault("session_id", m_out.group("session"))
+
+    # 5. SSH connection reset/closed & preauth
+    m_ssh_reset = RE_SSHD_RESET_CLOSED.search(msg)
+    if m_ssh_reset:
+        fields.setdefault("service", "sshd")
+        if "[preauth]" in msg:
+            fields.setdefault("action", "preauth_reset")
+            fields.setdefault("preauth", True)
+        else:
+            fields.setdefault("action", "connection_closed")
+        u = m_ssh_reset.group("inv_user") or m_ssh_reset.group("auth_user") or m_ssh_reset.group("norm_user")
+        if u:
+            fields.setdefault("user", u)
+        if m_ssh_reset.group("inv_user") or "invalid user" in msg.lower():
+            fields.setdefault("invalid_user", True)
+        fields.setdefault("ip", m_ssh_reset.group("ip"))
+        fields.setdefault("port", int(m_ssh_reset.group("port")))
+
+    # 6. Fallback IP and port extraction
+    if "ip" not in fields:
+        m_ip = RE_GENERIC_IP.search(msg)
+        if m_ip:
+            fields["ip"] = m_ip.group(0)
+
+    if "port" not in fields:
+        m_port = RE_GENERIC_PORT.search(msg)
+        if m_port:
+            with contextlib.suppress(ValueError):
+                fields["port"] = int(m_port.group(1))
 
 
 def resolve_syslog_timestamp(

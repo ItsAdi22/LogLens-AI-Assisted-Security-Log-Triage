@@ -1,5 +1,6 @@
 """Drain3 log template mining and event clustering."""
 
+import re
 from collections import Counter, defaultdict
 from collections.abc import Iterable
 from datetime import datetime
@@ -8,6 +9,41 @@ from drain3 import TemplateMiner
 from drain3.template_miner_config import TemplateMinerConfig
 
 from loglens.models import Cluster, Event
+
+RE_ISO_TIMESTAMP_LEADING = re.compile(
+    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}[T\s][0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?(?:Z|[+-][0-9]{2}:?[0-9]{2})?\s*"
+)
+RE_LEGACY_SYSLOG_LEADING = re.compile(
+    r"^[A-Z][a-z]{2}\s+[0-9]{1,2}\s+[0-9]{2}:[0-9]{2}:[0-9]{2}\s*"
+)
+RE_HOSTNAME_PROGRAM_PREFIX = re.compile(
+    r"^[a-zA-Z0-9_\-\.]+\s+(?:\([^\)]+\)|[a-zA-Z0-9_\-\.]+)(?:\[[0-9]+\])?:\s*"
+)
+RE_ISO_TIMESTAMP_ANYWHERE = re.compile(
+    r"\b[0-9]{4}-[0-9]{2}-[0-9]{2}[T\s][0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?(?:Z|[+-][0-9]{2}:?[0-9]{2})?\b"
+)
+
+
+def preprocess_drain_message(msg: str) -> str:
+    """Preprocess log line before Drain3 template mining.
+
+    1. Strip leading ISO8601 or legacy syslog timestamps.
+    2. Strip leading hostname and program/daemon prefix (e.g. 'mpanel (systemd): ').
+    3. Mask any remaining embedded ISO8601 timestamps.
+    """
+    cleaned = msg.strip()
+
+    # 1. Strip leading timestamps
+    cleaned = RE_ISO_TIMESTAMP_LEADING.sub("", cleaned)
+    cleaned = RE_LEGACY_SYSLOG_LEADING.sub("", cleaned)
+
+    # 2. Strip leading hostname and program prefix
+    cleaned = RE_HOSTNAME_PROGRAM_PREFIX.sub("", cleaned)
+
+    # 3. Mask any embedded ISO8601 timestamps in the body
+    cleaned = RE_ISO_TIMESTAMP_ANYWHERE.sub("<*>", cleaned)
+
+    return cleaned.strip()
 
 
 class DrainClusterer:
@@ -44,8 +80,9 @@ class DrainClusterer:
 
         Returns the assigned cluster ID.
         """
-        # Pass the message body to Drain3
-        res = self.miner.add_log_message(event.message)
+        # Pass the preprocessed message body to Drain3
+        processed_msg = preprocess_drain_message(event.message)
+        res = self.miner.add_log_message(processed_msg)
         cluster_id: int = int(res["cluster_id"])
         template: str = str(res["template_mined"])
 
@@ -60,8 +97,8 @@ class DrainClusterer:
 
         # Keep up to 3 distinct sample messages
         samples = self._sample_messages[cluster_id]
-        if len(samples) < 3 and event.message not in samples:
-            samples.append(event.message)
+        if len(samples) < 3 and processed_msg not in samples:
+            samples.append(processed_msg)
 
         # Track top fields (ip, user, method, path, status, action)
         counters = self._field_counters[cluster_id]

@@ -45,8 +45,12 @@
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
             <div style="font-weight: 500; font-size: 13px; color: var(--text-primary);">Forensic assessment</div>
             <div style="font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums;">
-              Confidence: <strong style="color: var(--accent);">{{ (finding.llm.confidence * 100)|round|int }}%</strong>
-              &bull; FP: <strong style="text-transform: capitalize;">{{ finding.llm.false_positive_likelihood }}</strong>
+              {% if finding.llm.confidence and finding.llm.confidence > 0 and finding.llm.confidence <= 1.0 %}
+                Confidence: <strong style="color: var(--accent);">{{ (finding.llm.confidence * 100)|round|int }}%</strong>
+                &bull; FP: <strong style="text-transform: capitalize;">{{ finding.llm.false_positive_likelihood }}</strong>
+              {% else %}
+                <span class="badge badge-info" style="font-size: 10px;">Rule-based</span>
+              {% endif %}
             </div>
           </div>
 
@@ -67,29 +71,47 @@
             </div>
           {% endif %}
 
-          {% if finding.llm.recommended_actions %}
-            <div>
-              <div style="font-size: 11px; color: var(--text-muted); font-weight: 500; margin-bottom: 2px;">
-                Remediation:
-              </div>
-              <ul style="padding-left: 18px; font-size: 12px; color: var(--positive); margin: 0;">
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted); font-weight: 500; margin-bottom: 2px;">
+              Remediation:
+            </div>
+            <ul style="padding-left: 18px; font-size: 12px; color: var(--positive); margin: 0;">
+              {% if finding.llm.recommended_actions %}
                 {% for act in finding.llm.recommended_actions[:2] %}
                   <li>{{ act }}</li>
                 {% endfor %}
-              </ul>
-            </div>
-          {% endif %}
+              {% else %}
+                <li>{{ get_rule_remediation(finding.rule_ids) }}</li>
+              {% endif %}
+            </ul>
+          </div>
         </div>
       {% else %}
-        <div style="background: var(--bg-card); border-radius: 6px; padding: 10px 14px; border: 1px dashed var(--border); display: flex; justify-content: space-between; align-items: center; gap: 10px;">
-          <div style="color: var(--text-muted); font-size: 12px;">
-            Rule triggered without forensic explanation
+        <div style="background: var(--bg-card); border-radius: 6px; padding: 12px; border: 1px solid var(--border);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span class="badge badge-info" style="font-size: 10px; font-weight: 600;">Rule-based</span>
+              <span style="font-weight: 500; font-size: 13px; color: var(--text-primary);">Deterministic match</span>
+            </div>
+            <form hx-post="/runs/{{ run_id }}/findings/{{ finding.id }}/explain" hx-target="#finding-{{ finding.id }}-card" hx-swap="outerHTML" style="margin: 0;">
+              <button type="submit" class="btn btn-secondary btn-sm" title="Run AI forensic assessment for this finding">
+                Explain with AI
+              </button>
+            </form>
           </div>
-          <form hx-post="/runs/{{ run_id }}/findings/{{ finding.id }}/explain" hx-target="#finding-{{ finding.id }}-card" hx-swap="outerHTML" style="margin: 0;">
-            <button type="submit" class="btn btn-primary btn-sm">
-              Explain with AI
-            </button>
-          </form>
+
+          <p style="font-size: 13px; line-height: 1.45; margin-bottom: 8px; color: var(--text-secondary);">
+            {{ get_rule_description(finding.rule_ids) }}
+          </p>
+
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted); font-weight: 500; margin-bottom: 2px;">
+              Remediation:
+            </div>
+            <div style="font-size: 12px; color: var(--positive); line-height: 1.4;">
+              {{ get_rule_remediation(finding.rule_ids) }}
+            </div>
+          </div>
         </div>
       {% endif %}
     </div>

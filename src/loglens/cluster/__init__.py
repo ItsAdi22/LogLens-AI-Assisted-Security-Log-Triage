@@ -1,6 +1,6 @@
 """Log clustering, statistical detection, and error classification package."""
 
-from loglens.cluster.drain import DrainClusterer
+from loglens.cluster.drain import DrainClusterer, preprocess_drain_message
 from loglens.cluster.errors import (
     ClassifiedError,
     classify_cluster_error,
@@ -20,4 +20,5 @@ __all__ = [
     "detect_rare_templates",
     "detect_rate_spikes",
     "extract_classified_errors",
+    "preprocess_drain_message",
 ]

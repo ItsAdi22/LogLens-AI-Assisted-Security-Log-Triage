@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from loglens.models import Event, compute_raw_hash
+from loglens.parsers.base import extract_common_system_fields
 
 IP_REGEX = re.compile(r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b")
 ISO_TS_REGEX = re.compile(
@@ -54,6 +55,8 @@ class GenericParser:
         ip_match = IP_REGEX.search(line)
         if ip_match:
             fields["ip"] = ip_match.group(0)
+
+        extract_common_system_fields(line, fields)
 
         # Detect severity hint from common keywords
         lower = line.lower()

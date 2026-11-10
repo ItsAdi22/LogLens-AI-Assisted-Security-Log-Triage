@@ -7,6 +7,7 @@ from loglens.rules.engine import (
     load_rule_from_file,
     load_rules_from_directory,
 )
+from loglens.rules.remediation import get_rule_description, get_rule_remediation
 from loglens.rules.schema import Rule, RuleCondition, RuleMatch
 from loglens.rules.sigma import (
     convert_sigma_dict_to_rule,
@@ -31,6 +32,8 @@ __all__ = [
     "RuleMatch",
     "convert_sigma_dict_to_rule",
     "get_builtin_rules",
+    "get_rule_description",
+    "get_rule_remediation",
     "import_sigma_directory",
     "import_sigma_file",
     "load_rule_from_file",

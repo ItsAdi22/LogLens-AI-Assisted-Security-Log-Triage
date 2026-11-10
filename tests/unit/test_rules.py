@@ -124,3 +124,145 @@ def test_rule_engine_web_sqli_and_scanner() -> None:
     fired_rules = {r for f in findings for r in f.rule_ids}
     assert "web-sqli-attempt-005" in fired_rules
     assert "web-scanner-ua-007" in fired_rules
+
+
+def test_ssh_invalid_user_probe_and_escalation() -> None:
+    """Verify single invalid user event fires low severity probe, escalating to high by IP window."""
+    rules = get_builtin_rules()
+    engine = RuleEngine(rules)
+    now = datetime.now(UTC)
+
+    # 1. Single invalid user probe
+    single_ev = Event(
+        ts=now,
+        source="sshd",
+        host="srv",
+        severity_hint="low",
+        message="Connection reset by invalid user hacker 222.167.207.101 port 52342 [preauth]",
+        fields={
+            "user": "hacker",
+            "ip": "222.167.207.101",
+            "port": 52342,
+            "invalid_user": True,
+            "action": "preauth_reset",
+            "service": "sshd",
+        },
+        raw_hash="hash_probe_1",
+    )
+    single_cluster = Cluster(
+        id="cluster-probe-1",
+        template="Connection reset by invalid user <*> <*> port <*> [preauth]",
+        count=1,
+        first_seen=now,
+        last_seen=now,
+        sample_messages=[single_ev.message],
+    )
+    findings_single = engine.evaluate([single_ev], [single_cluster])
+    single_rules = {r for f in findings_single for r in f.rule_ids}
+    assert "ssh-invalid-user" in single_rules
+    assert "ssh-preauth-reset" in single_rules
+    # Single event has low severity
+    probe_finding = next(f for f in findings_single if "ssh-invalid-user" in f.rule_ids)
+    assert probe_finding.rule_severity == "low"
+
+    # 2. Escalating: 6 probes from the same IP within 1 minute
+    events_burst: list[Event] = []
+    for i in range(6):
+        events_burst.append(
+            Event(
+                ts=now + timedelta(seconds=i * 5),
+                source="sshd",
+                host="srv",
+                severity_hint="low",
+                message=f"Connection reset by invalid user test{i} 222.167.207.101 port 5000{i} [preauth]",
+                fields={
+                    "user": f"test{i}",
+                    "ip": "222.167.207.101",
+                    "port": 50000 + i,
+                    "invalid_user": True,
+                    "action": "preauth_reset",
+                    "service": "sshd",
+                },
+                raw_hash=f"hash_burst_{i}",
+            )
+        )
+    burst_cluster = Cluster(
+        id="cluster-burst-1",
+        template="Connection reset by invalid user <*> 222.167.207.101 port <*> [preauth]",
+        count=6,
+        first_seen=now,
+        last_seen=now + timedelta(seconds=30),
+        top_fields={"ip": [("222.167.207.101", 6)]},
+        sample_messages=[events_burst[0].message],
+    )
+    findings_burst = engine.evaluate(events_burst, [burst_cluster])
+    burst_rules = {r for f in findings_burst for r in f.rule_ids}
+    # Escalated to high severity ssh-bruteforce
+    assert "ssh-bruteforce" in burst_rules
+    bf_finding = next(f for f in findings_burst if "ssh-bruteforce" in f.rule_ids)
+    assert bf_finding.rule_severity == "high"
+
+
+def test_benign_rules_cron_systemd_pam() -> None:
+    """Verify benign rule pack matches cron, systemd-logind, and pam_unix sessions with info severity."""
+    rules = get_builtin_rules()
+    engine = RuleEngine(rules)
+    now = datetime.now(UTC)
+
+    ev_cron = Event(
+        ts=now,
+        source="cron",
+        host="srv",
+        severity_hint="info",
+        message="CRON[100]: (root) CMD (/backup.sh)",
+        fields={"service": "cron", "action": "cron_cmd", "user": "root"},
+        raw_hash="hash_cron",
+    )
+    ev_logind = Event(
+        ts=now,
+        source="systemd-logind",
+        host="srv",
+        severity_hint="info",
+        message="systemd-logind[101]: New session 10 of user root.",
+        fields={"service": "systemd-logind", "action": "new_session", "user": "root"},
+        raw_hash="hash_logind",
+    )
+    ev_pam = Event(
+        ts=now,
+        source="auth",
+        host="srv",
+        severity_hint="info",
+        message="pam_unix(systemd-user:session): session opened for user root(uid=0)",
+        fields={"service": "systemd-user", "action": "session_opened", "user": "root"},
+        raw_hash="hash_pam",
+    )
+    clusters = [
+        Cluster(id="c-cron", template="CRON[<*>]: (root) CMD (<*>)", count=1, first_seen=now, last_seen=now),
+        Cluster(id="c-logind", template="systemd-logind[<*>]: New session <*> of user root.", count=1, first_seen=now, last_seen=now),
+        Cluster(id="c-pam", template="pam_unix(systemd-user:session): session opened for user root", count=1, first_seen=now, last_seen=now),
+    ]
+
+    findings = engine.evaluate([ev_cron, ev_logind, ev_pam], clusters)
+    benign_ids = {r for f in findings for r in f.rule_ids}
+    assert "benign-cron-session" in benign_ids
+    assert "benign-systemd-logind" in benign_ids
+    assert "benign-pam-session" in benign_ids
+
+
+def test_rule_remediation_lookup() -> None:
+    """Verify get_rule_remediation returns specific, non-generic advice."""
+    from loglens.rules.remediation import get_rule_description, get_rule_remediation
+
+    rem_invalid = get_rule_remediation(["ssh-invalid-user"])
+    assert "sshd_config" in rem_invalid
+    assert "PasswordAuthentication no" in rem_invalid
+
+    rem_preauth = get_rule_remediation(["ssh-preauth-reset"])
+    assert "preauth" in rem_preauth.lower() or "rate limit" in rem_preauth.lower()
+
+    rem_bf = get_rule_remediation(["ssh-bruteforce"])
+    assert "Fail2ban" in rem_bf or "nftables" in rem_bf
+
+    desc = get_rule_description(["ssh-invalid-user"])
+    assert "username" in desc.lower()
+

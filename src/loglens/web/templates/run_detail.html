@@ -57,9 +57,9 @@
     <div class="metric-value">{{ report.metadata.total_clusters }}</div>
   </div>
   <div class="metric-box">
-    <div class="metric-label">Security findings</div>
-    <div class="metric-value" style="color: {% if report.findings|length > 0 %}#f87171{% else %}var(--text-primary){% endif %};">
-      {{ report.findings|length }}
+    <div class="metric-label">Security events</div>
+    <div class="metric-value" style="color: {% if findings|length > 0 %}#f87171{% else %}var(--text-primary){% endif %};">
+      {{ findings|length }}
     </div>
   </div>
   <div class="metric-box">
@@ -70,15 +70,15 @@
   </div>
 </div>
 
-<!-- Security Findings Section -->
+<!-- Security Events Section -->
 <div style="margin-bottom: 32px;">
   <div class="card-header" style="margin-bottom: 12px; flex-wrap: wrap; gap: 12px;">
     <div>
-      <h2 class="card-title">Security findings</h2>
-      <p class="card-subtitle">{{ report.findings|length }} detections requiring review</p>
+      <h2 class="card-title">Security events</h2>
+      <p class="card-subtitle">{{ findings|length }} detections requiring review</p>
     </div>
 
-    {% if report.findings %}
+    {% if findings %}
       <div>
         <button type="button" class="btn btn-secondary btn-sm" id="btn-toggle-findings-layout" onclick="toggleFindingsLayout()">
           List view
@@ -87,10 +87,10 @@
     {% endif %}
   </div>
 
-  {% if report.findings %}
+  {% if findings %}
     <!-- Filter Chips Bar -->
     <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
-      <button type="button" class="filter-chip active" onclick="filterFindings('all', this)">All ({{ report.findings|length }})</button>
+      <button type="button" class="filter-chip active" onclick="filterFindings('all', this)">All ({{ findings|length }})</button>
       <button type="button" class="filter-chip" onclick="filterFindings('critical', this)">Critical</button>
       <button type="button" class="filter-chip" onclick="filterFindings('high', this)">High</button>
       <button type="button" class="filter-chip" onclick="filterFindings('medium', this)">Medium</button>
@@ -99,17 +99,37 @@
 
     <!-- Responsive Grid of Findings -->
     <div id="findings-container" class="findings-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr)); gap: 16px;">
-      {% for finding in report.findings %}
+      {% for finding in findings %}
         {% include "partials/finding_card.html" %}
       {% endfor %}
     </div>
   {% else %}
     <div class="card" style="text-align: center; color: var(--text-muted); padding: 32px 16px;">
-      <p style="color: var(--positive); font-weight: 500; font-size: 14px;">No security findings detected</p>
+      <p style="color: var(--positive); font-weight: 500; font-size: 14px;">No security events detected</p>
       <p style="font-size: 12px; margin-top: 4px;">This log file matched no intrusion signatures or unauthorized attack patterns</p>
     </div>
   {% endif %}
 </div>
+
+{% if noise_findings %}
+<!-- Collapsed Noise / Benign Events Section -->
+<details style="margin-bottom: 32px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px;">
+  <summary style="cursor: pointer; font-weight: 500; font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; user-select: none;">
+    <span>
+      Noise & benign activity ({{ noise_findings|length }})
+      <span style="font-size: 11px; color: var(--text-muted); font-weight: normal; margin-left: 8px;">
+        Routine cron executions, session lifecycles, and non-security system tasks
+      </span>
+    </span>
+    <span class="badge badge-info" style="font-size: 10px;">Hidden by default</span>
+  </summary>
+  <div style="margin-top: 14px; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 460px), 1fr)); gap: 14px;">
+    {% for finding in noise_findings %}
+      {% include "partials/finding_card.html" %}
+    {% endfor %}
+  </div>
+</details>
+{% endif %}
 
 <!-- Application & System Errors Section -->
 <div style="margin-bottom: 32px;">

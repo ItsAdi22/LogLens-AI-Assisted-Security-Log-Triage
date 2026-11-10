@@ -104,6 +104,16 @@ def classify_cluster_error(cluster: Cluster) -> ClassifiedError | None:
     """Classify a cluster as an application or system error if it matches known error heuristics."""
     text_to_check = f"{cluster.template} {' '.join(cluster.sample_messages)}"
 
+    # Guard: SSH, PAM, authentication, and security attack patterns must NEVER reach
+    # the generic application error classifier
+    if re.search(
+        r"\b(sshd|\[preauth\]|invalid\s+user|authenticating\s+user|pam_unix|failed\s+password|"
+        r"accepted\s+(?:password|publickey)|connection\s+(?:reset|closed)\s+by)\b",
+        text_to_check,
+        re.IGNORECASE,
+    ):
+        return None
+
     for regex, cat_id, cat_label, default_sev in ERROR_PATTERNS:
         if regex.search(text_to_check):
             sample = cluster.sample_messages[0] if cluster.sample_messages else cluster.template

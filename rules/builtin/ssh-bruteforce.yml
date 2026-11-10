@@ -1,0 +1,21 @@
+id: ssh-bruteforce
+title: SSH Brute Force / Probe Storm
+description: High volume of failed authentications, invalid users, or preauth connection drops from a single IP address.
+source:
+  - sshd
+  - auth
+match:
+  template_regex: "(?:Failed password|invalid user|Connection (?:closed|reset) by.*preauth)"
+condition:
+  group_by: ip
+  count_gte: 5
+  window: 5m
+severity: high
+tags:
+  - attack.credential_access
+  - attack.t1110
+  - attack.t1110.001
+references:
+  - https://attack.mitre.org/techniques/T1110/001/
+false_positives:
+  - Misconfigured client repeatedly reconnecting with outdated key or credentials

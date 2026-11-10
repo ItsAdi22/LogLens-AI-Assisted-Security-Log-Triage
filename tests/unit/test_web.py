@@ -891,4 +891,90 @@ def test_ist_rendered_in_index_and_run_detail(tmp_path: Path) -> None:
     assert "IST" in res_run.text
 
 
+def test_run_detail_security_events_and_noise_separation(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    storage = StorageManager(db_file)
+
+    now = datetime.now(UTC)
+    c_sec = Cluster(
+        id="c-sec-01",
+        template="Connection reset by invalid user <*> port <*> [preauth]",
+        count=1,
+        first_seen=now,
+        last_seen=now,
+        sample_messages=["Connection reset by invalid user admin 203.0.113.1 port 44212 [preauth]"],
+    )
+    c_benign = Cluster(
+        id="c-cron-01",
+        template="CRON[<*>]: (root) CMD (<*>)",
+        count=10,
+        first_seen=now,
+        last_seen=now,
+        sample_messages=["CRON[100]: (root) CMD (/usr/bin/backup.sh)"],
+    )
+    c_err = Cluster(
+        id="c-err-01",
+        template="SQLSTATE[HY000] Connection refused to database",
+        count=2,
+        first_seen=now,
+        last_seen=now,
+        sample_messages=["SQLSTATE[HY000] Connection refused to database"],
+    )
+
+    f_sec = Finding(
+        id="finding-ssh-invalid-user",
+        cluster_ids=["c-sec-01"],
+        rule_ids=["ssh-invalid-user"],
+        rule_severity="low",
+        llm=None,  # No LLM -> should be pure rule-based
+    )
+    f_noise = Finding(
+        id="finding-benign-cron-session",
+        cluster_ids=["c-cron-01"],
+        rule_ids=["benign-cron-session"],
+        rule_severity="info",
+        llm=None,
+    )
+
+    meta = ReportMetadata(
+        generated_at=now,
+        log_source="server-auth.log",
+        total_lines=50,
+        parsed_events=48,
+        unparsed_lines=2,
+        total_clusters=3,
+        findings_count=2,
+    )
+    report = Report(
+        metadata=meta,
+        findings=[f_sec, f_noise],
+        clusters=[c_sec, c_benign, c_err],
+    )
+    run_id = storage.save_run(report, run_id="run-separation-test")
+    storage.close()
+
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    res = client.get(f"/runs/{run_id}")
+    assert res.status_code == 200
+
+    # 1. Separated sections
+    assert "Security events" in res.text
+    assert "Application errors" in res.text
+    assert "Noise & benign activity" in res.text
+
+    # 2. Rule-based display with NO confidence percentage when no LLM triage exists
+    assert "Rule-based" in res.text
+    # Finding card without LLM should NOT have Confidence: XX%
+    assert "Confidence:" not in res.text
+
+    # 3. Fallback remediation text is rule-specific
+    assert "PasswordAuthentication no" in res.text or "firewall" in res.text
+
+    # 4. Deduped sample excerpt: since c_err sample_message == template, "Sample excerpt" should NOT appear for it
+    assert "Sample excerpt" not in res.text
+
+
+
 

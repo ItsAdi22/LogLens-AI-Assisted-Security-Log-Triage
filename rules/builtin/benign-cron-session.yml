@@ -1,0 +1,18 @@
+id: benign-cron-session
+title: Benign Cron Scheduled Task
+description: Routine periodic maintenance job or script executed by cron daemon.
+source:
+  - cron
+  - CRON
+  - auth
+  - syslog
+match:
+  field_matches:
+    service: cron
+severity: info
+tags:
+  - benign
+  - noise
+  - system.cron
+false_positives:
+  - Standard periodic system automation tasks

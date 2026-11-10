@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from loglens.models import Event, compute_raw_hash
-from loglens.parsers.base import resolve_syslog_timestamp
+from loglens.parsers.base import extract_common_system_fields, resolve_syslog_timestamp
 
 # Regex patterns for syslog headers
 # Legacy syslog: Oct 11 14:32:10 hostname daemon[pid]: message
@@ -54,10 +54,15 @@ class AuthLogParser:
         auth_matches = 0
         for line in sample_lines:
             if (
-                any(k in line for k in ("sshd[", "sudo:", "pam_unix", "sshd:", "su:"))
+                any(k in line for k in ("sshd[", "sudo:", "pam_unix", "sshd:", "su:", "systemd-logind"))
                 or "Failed password" in line
                 or "Accepted publickey" in line
                 or "Accepted password" in line
+                or "invalid user" in line
+                or "[preauth]" in line
+                or "Connection reset by" in line
+                or "Connection closed by" in line
+                or "authenticating user" in line
             ):
                 auth_matches += 1
 
@@ -176,6 +181,14 @@ class AuthLogParser:
                                 if ruser_match and ruser_match.group(1):
                                     fields["user"] = ruser_match.group(1)
                                 severity_hint = "warning"
+
+        # Fallback extraction for PAM sessions, cron, systemd-logind, and SSH preauth
+        extract_common_system_fields(msg, fields)
+
+        if fields.get("action") == "preauth_reset":
+            severity_hint = "low"
+            if source == "auth":
+                source = "sshd"
 
         return Event(
             ts=ts,

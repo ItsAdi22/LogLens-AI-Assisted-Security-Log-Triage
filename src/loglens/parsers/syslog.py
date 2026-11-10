@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from loglens.models import Event, compute_raw_hash
-from loglens.parsers.base import resolve_syslog_timestamp
+from loglens.parsers.base import extract_common_system_fields, resolve_syslog_timestamp
 
 # RFC 3164: <PRI>? Mon DD HH:MM:SS host program[pid]: message
 RE_RFC3164 = re.compile(
@@ -93,6 +93,8 @@ class SyslogParser:
             if ip_match:
                 fields["ip"] = ip_match.group(0)
 
+            extract_common_system_fields(msg, fields)
+
             return Event(
                 ts=ts,
                 source=app,
@@ -120,6 +122,8 @@ class SyslogParser:
             ip_match = IP_REGEX.search(msg)
             if ip_match:
                 fields["ip"] = ip_match.group(0)
+
+            extract_common_system_fields(msg, fields)
 
             return Event(
                 ts=ts,
