@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
+import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from loglens.models import Cluster, Finding, LLMAssessment, Report, ReportMetadata
@@ -295,6 +298,73 @@ def test_analyze_submit_empty_fails(tmp_path: Path) -> None:
         data={"log_text": "   ", "format": "auto"},
     )
     assert response.status_code == 400
+
+
+def test_analyze_submit_panel_api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    db_file = tmp_path / "test.db"
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    class MockResponse:
+        status_code = 200
+        text = "Nov 10 12:00:01 server sshd[1024]: Failed password for root from 192.168.1.50 port 22 ssh2\n"
+
+    orig_get = httpx.Client.get
+
+    def mock_get(self: Any, url: Any, *args: Any, **kwargs: Any) -> Any:
+        if "pelican.example.com" in str(url):
+            return MockResponse()
+        return orig_get(self, url, *args, **kwargs)
+
+    monkeypatch.setattr(httpx.Client, "get", mock_get)
+
+    response = client.post(
+        "/analyze",
+        data={
+            "panel_url": "https://pelican.example.com",
+            "panel_api_key": "ptlc_testkey123",
+            "panel_server_id": "srv-99",
+            "panel_file_path": "logs/latest.log",
+            "format": "auto",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    redirect_url = response.headers["location"]
+    resp_run = client.get(redirect_url)
+    assert resp_run.status_code == 200
+    assert "pelican://srv-99/logs/latest.log" in resp_run.text
+
+
+def test_analyze_submit_panel_api_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    db_file = tmp_path / "test.db"
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    class MockErrorResponse:
+        status_code = 403
+        text = "Forbidden"
+
+    orig_get = httpx.Client.get
+
+    def mock_get_error(self: Any, url: Any, *args: Any, **kwargs: Any) -> Any:
+        if "pelican.example.com" in str(url):
+            return MockErrorResponse()
+        return orig_get(self, url, *args, **kwargs)
+
+    monkeypatch.setattr(httpx.Client, "get", mock_get_error)
+
+    response = client.post(
+        "/analyze",
+        data={
+            "panel_url": "https://pelican.example.com",
+            "panel_api_key": "ptlc_badkey",
+            "panel_server_id": "srv-99",
+            "format": "auto",
+        },
+    )
+    assert response.status_code == 400
+    assert "Panel API returned HTTP 403" in response.text
 
 
 def test_settings_page_and_save(tmp_path: Path) -> None:

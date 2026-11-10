@@ -5,10 +5,12 @@ from __future__ import annotations
 import html
 import logging
 import os
+import urllib.parse
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import httpx
 from fastapi import (
     Depends,
     FastAPI,
@@ -260,12 +262,16 @@ def create_app(
     async def analyze_submit(
         file: UploadFile | None = File(None),
         log_text: str | None = Form(None),
+        panel_url: str | None = Form(None),
+        panel_api_key: str | None = Form(None),
+        panel_server_id: str | None = Form(None),
+        panel_file_path: str = Form("logs/latest.log"),
         format: str = Form("auto"),
         provider: str = Form("mock"),
         enable_llm: bool = Form(False),
         notify_on_complete: bool = Form(False),
     ) -> RedirectResponse:
-        """Process an uploaded log file or pasted raw log text, running triage and saving the run."""
+        """Process an uploaded log file, pasted raw log text, or Pelican/Pterodactyl API pull."""
         text_content = ""
         source_name = "pasted-snippet"
 
@@ -278,6 +284,36 @@ def create_app(
         if not text_content and log_text and log_text.strip():
             text_content = log_text.strip()
             source_name = "raw-log-input"
+
+        if not text_content and panel_url and panel_api_key and panel_server_id:
+            clean_url = panel_url.strip().rstrip("/")
+            target_file = panel_file_path.strip().lstrip("/") or "logs/latest.log"
+            encoded_file = urllib.parse.quote(f"/{target_file}")
+            api_endpoint = f"{clean_url}/api/client/servers/{panel_server_id.strip()}/files/contents?file={encoded_file}"
+            try:
+                with httpx.Client(timeout=15.0) as client_http:
+                    resp = client_http.get(
+                        api_endpoint,
+                        headers={
+                            "Authorization": f"Bearer {panel_api_key.strip()}",
+                            "Accept": "application/json, text/plain",
+                        },
+                    )
+                    if resp.status_code == 200:
+                        text_content = resp.text
+                        source_name = f"pelican://{panel_server_id.strip()}/{target_file}"
+                    else:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Panel API returned HTTP {resp.status_code}: {resp.text[:200]}",
+                        )
+            except HTTPException:
+                raise
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Failed to connect to Panel API: {exc}",
+                ) from exc
 
         if not text_content.strip():
             raise HTTPException(

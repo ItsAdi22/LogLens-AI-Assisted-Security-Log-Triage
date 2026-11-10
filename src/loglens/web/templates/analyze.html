@@ -14,14 +14,18 @@
   <form action="/analyze" method="post" enctype="multipart/form-data" class="card" style="padding: 24px;">
     <!-- Source Selection Tabs -->
     <div style="margin-bottom: 20px;">
-      <div style="display: flex; gap: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+      <div style="display: flex; gap: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px; flex-wrap: wrap;">
         <label style="cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500;">
-          <input type="radio" name="input_mode" value="upload" checked onclick="document.getElementById('upload-section').style.display='block'; document.getElementById('paste-section').style.display='none';" style="accent-color: var(--accent);">
+          <input type="radio" name="input_mode" value="upload" checked onclick="switchInputMode('upload')" style="accent-color: var(--accent);">
           <span>File upload</span>
         </label>
         <label style="cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--text-secondary);">
-          <input type="radio" name="input_mode" value="paste" onclick="document.getElementById('upload-section').style.display='none'; document.getElementById('paste-section').style.display='block';" style="accent-color: var(--accent);">
+          <input type="radio" name="input_mode" value="paste" onclick="switchInputMode('paste')" style="accent-color: var(--accent);">
           <span>Paste raw text</span>
+        </label>
+        <label style="cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--text-secondary);">
+          <input type="radio" name="input_mode" value="api" onclick="switchInputMode('api')" style="accent-color: var(--accent);">
+          <span>Pelican / Pterodactyl API</span>
         </label>
       </div>
 
@@ -43,6 +47,41 @@
       <!-- Paste Text Section -->
       <div id="paste-section" style="display: none;">
         <textarea name="log_text" rows="8" placeholder="Paste server log lines here...&#10;Nov 10 12:00:01 server sshd[1024]: Failed password for root from 198.51.100.22 port 51234 ssh2&#10;Nov 10 12:00:02 server sshd[1025]: Failed password for invalid user admin from 198.51.100.22 port 51235 ssh2" style="width: 100%; font-family: var(--font-mono); font-size: 12px; resize: vertical;"></textarea>
+      </div>
+
+      <!-- Pelican / Pterodactyl API Section -->
+      <div id="api-section" style="display: none; background: var(--bg-card); border-radius: 6px; padding: 16px; border: 1px solid var(--border);">
+        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
+          Fetch server logs directly over HTTPS using a Pelican or Pterodactyl Client API key:
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 12px;">
+          <div>
+            <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">
+              Panel URL
+            </label>
+            <input type="url" name="panel_url" placeholder="https://pelican.yourdomain.com" style="width: 100%; font-size: 12px;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">
+              Client API key
+            </label>
+            <input type="password" name="panel_api_key" placeholder="ptlc_... or pelican_..." style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px;">
+          <div>
+            <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">
+              Server identifier / UUID
+            </label>
+            <input type="text" name="panel_server_id" placeholder="8-character short id or full UUID" style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">
+              Log file path
+            </label>
+            <input type="text" name="panel_file_path" value="logs/latest.log" placeholder="logs/latest.log or proxy.log" style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+          </div>
+        </div>
       </div>
     </div>
 
@@ -113,6 +152,12 @@
 </div>
 
 <script>
+  function switchInputMode(mode) {
+    document.getElementById('upload-section').style.display = mode === 'upload' ? 'block' : 'none';
+    document.getElementById('paste-section').style.display = mode === 'paste' ? 'block' : 'none';
+    document.getElementById('api-section').style.display = mode === 'api' ? 'block' : 'none';
+  }
+
   function updateFileName(input) {
     const label = document.getElementById('file-label-text');
     if (input.files && input.files[0]) {

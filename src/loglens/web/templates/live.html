@@ -137,15 +137,30 @@
   </div>
 </div>
 
-<!-- Section 3: Connect Remote VPS & Panels (Pelican, Pterodactyl, Docker) -->
+<!-- Section 3: Connect Remote VPS & Panels (Pelican, CyberPanel, Pterodactyl, Docker) -->
 <div class="card">
   <div class="card-header" style="margin-bottom: 16px;">
     <div>
       <h2 class="card-title">Remote server forwarding</h2>
-      <p class="card-subtitle">Pipe live streams from your VPS, Docker Compose containers, or game panels into LogLens</p>
+      <p class="card-subtitle">Pipe live streams from your VPS, Docker Compose containers, or control panels into LogLens</p>
     </div>
     <div>
       <span class="code" style="font-size: 11px;">POST /api/ingest/stream</span>
+    </div>
+  </div>
+
+  <!-- Localhost SSH Pull Callout -->
+  <div style="background: var(--bg-card); border-left: 3px solid var(--accent); padding: 12px 14px; border-radius: 4px; margin-bottom: 16px; font-size: 12px; color: var(--text-secondary); border: 1px solid var(--border); border-left: 3px solid var(--accent);">
+    <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
+      Hosting LogLens locally on your PC (localhost:8080)?
+    </div>
+    <div>
+      No port forwarding, static IP, or public tunnel required. Pull directly from your local terminal using SSH stdout pipe:
+    </div>
+    <div style="margin-top: 6px; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+      <pre style="margin: 0; flex: 1; padding: 6px 10px; font-size: 11px;">ssh root@&lt;YOUR_VPS&gt; "&lt;remote_tail_cmd&gt;" | curl -s -X POST http://localhost:8080/api/ingest/stream -H "X-Log-Source: &lt;source&gt;" -T -</pre>
+      <button type="button" class="btn btn-secondary btn-sm" style="height: 26px; font-size: 11px;"
+              onclick="copyToClipboard('ssh root@<YOUR_VPS> &quot;<remote_tail_cmd>&quot; | curl -s -X POST http://localhost:8080/api/ingest/stream -H &quot;X-Log-Source: remote-stream&quot; -T -', this)">Copy</button>
     </div>
   </div>
 
@@ -193,7 +208,50 @@
       </div>
     </div>
 
-    <!-- Box 2: Wings Node & Linux Host -->
+    <!-- Box 2: CyberPanel (OpenLiteSpeed & Websites) -->
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 14px; min-width: 0;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+        <div style="font-weight: 600; font-size: 13px; color: var(--text-primary);">
+          CyberPanel (OpenLiteSpeed &amp; Sites)
+        </div>
+        <span class="badge badge-high" style="font-size: 10px;">Port 8090 / OLS</span>
+      </div>
+      <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
+        Forward web server, virtual hosts, and ModSecurity WAF block logs:
+      </p>
+
+      <!-- OpenLiteSpeed Access Log -->
+      <div style="margin-bottom: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <span style="font-size: 11px; color: var(--text-muted); font-weight: 500;">OpenLiteSpeed global access log:</span>
+          <button type="button" class="btn btn-secondary btn-sm" style="height: 20px; font-size: 10px; padding: 0 6px;"
+                  onclick="copyToClipboard('tail -F /usr/local/lsws/logs/access.log | curl -s -X POST http://<YOUR_IP>:8080/api/ingest/stream -H &quot;X-Log-Source: cyberpanel-ols&quot; -T -', this)">Copy</button>
+        </div>
+        <pre>tail -F /usr/local/lsws/logs/access.log | curl -s -X POST http://&lt;YOUR_IP&gt;:8080/api/ingest/stream -H "X-Log-Source: cyberpanel-ols" -T -</pre>
+      </div>
+
+      <!-- Domain Virtual Hosts -->
+      <div style="margin-bottom: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <span style="font-size: 11px; color: var(--text-muted); font-weight: 500;">All hosted websites access logs:</span>
+          <button type="button" class="btn btn-secondary btn-sm" style="height: 20px; font-size: 10px; padding: 0 6px;"
+                  onclick="copyToClipboard('tail -F /home/*/logs/*.access_log | curl -s -X POST http://<YOUR_IP>:8080/api/ingest/stream -H &quot;X-Log-Source: cyberpanel-sites&quot; -T -', this)">Copy</button>
+        </div>
+        <pre>tail -F /home/*/logs/*.access_log | curl -s -X POST http://&lt;YOUR_IP&gt;:8080/api/ingest/stream -H "X-Log-Source: cyberpanel-sites" -T -</pre>
+      </div>
+
+      <!-- ModSecurity & Errors -->
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <span style="font-size: 11px; color: var(--text-muted); font-weight: 500;">OpenLiteSpeed errors &amp; WAF blocks:</span>
+          <button type="button" class="btn btn-secondary btn-sm" style="height: 20px; font-size: 10px; padding: 0 6px;"
+                  onclick="copyToClipboard('tail -F /usr/local/lsws/logs/error.log | curl -s -X POST http://<YOUR_IP>:8080/api/ingest/stream -H &quot;X-Log-Source: cyberpanel-waf&quot; -T -', this)">Copy</button>
+        </div>
+        <pre>tail -F /usr/local/lsws/logs/error.log | curl -s -X POST http://&lt;YOUR_IP&gt;:8080/api/ingest/stream -H "X-Log-Source: cyberpanel-waf" -T -</pre>
+      </div>
+    </div>
+
+    <!-- Box 3: Wings Node & Linux Host -->
     <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 14px; min-width: 0;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
         <div style="font-weight: 600; font-size: 13px; color: var(--text-primary);">
