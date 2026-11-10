@@ -23,6 +23,28 @@
   </div>
 </div>
 
+{% if active_sessions %}
+  <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 6px; padding: 12px 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span class="live-dot" style="background: #10b981;"></span>
+      <div>
+        <div style="font-weight: 600; font-size: 13px; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+          <span>Live stream active</span>
+          <span class="badge badge-low" style="font-size: 10px;">{{ active_sessions|length }} active</span>
+        </div>
+        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+          {% for s in active_sessions %}
+            <span style="font-family: var(--font-mono); color: var(--text-primary);">{{ s.file_name }}</span> &bull; <span style="color: var(--accent); font-weight: 500;">{{ s.total_lines or 0 }} lines</span> &bull; <span>{{ s.total_findings or 0 }} threats</span>{% if not loop.last %} &bull; {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div>
+      <a href="/live" class="btn btn-secondary btn-sm" style="font-size: 12px;">Open live monitor &rarr;</a>
+    </div>
+  </div>
+{% endif %}
+
 <!-- Global Metrics -->
 <div class="metric-grid">
   <div class="metric-box">
@@ -125,9 +147,14 @@
           {% for run in runs %}
             <tr>
               <td>
-                <a href="/runs/{{ run.run_id }}" style="color: var(--accent); font-family: var(--font-mono); text-decoration: none; font-weight: 500;">
-                  {{ run.run_id }}
-                </a>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <a href="/runs/{{ run.run_id }}" style="color: var(--accent); font-family: var(--font-mono); text-decoration: none; font-weight: 500;">
+                    {{ run.run_id }}
+                  </a>
+                  {% if run.run_id.startswith('run-live-') %}
+                    <span class="badge badge-low" style="font-size: 9px; padding: 1px 5px;">LIVE</span>
+                  {% endif %}
+                </div>
               </td>
               <td style="color: var(--text-secondary); font-size: 12px; font-variant-numeric: tabular-nums;">{{ run.generated_at }}</td>
               <td><span class="code">{{ run.log_source }}</span></td>

@@ -239,6 +239,7 @@ def create_app(
         stats = storage.get_global_stats()
         timeline = storage.get_timeline_stats(days=7)
         runs = storage.list_runs(limit=25)
+        active_sessions = [s for s in live_manager.list_sessions() if s.get("status") == "ACTIVE"]
         return templates.TemplateResponse(
             request=request,
             name="index.html",
@@ -246,6 +247,7 @@ def create_app(
                 "stats": stats,
                 "timeline": timeline,
                 "runs": runs,
+                "active_sessions": active_sessions,
             },
         )
 

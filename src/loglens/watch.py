@@ -40,6 +40,7 @@ class WatchMonitor:
         interval: float = 2.0,
         from_start: bool = False,
         console: Console | None = None,
+        run_id: str | None = None,
     ) -> None:
         self.log_path = log_path
         self.parser = parser
@@ -51,6 +52,10 @@ class WatchMonitor:
         self._running = False
         self.rule_engine = RuleEngine(get_builtin_rules())
         self.clusterer = DrainClusterer()
+        self.run_id = run_id or f"run-live-{uuid.uuid4().hex[:8]}"
+        self.all_findings: list[Finding] = []
+        self.total_lines_streamed = 0
+        self.total_events_streamed = 0
 
     def stop(self) -> None:
         """Signal the watch loop to terminate."""
@@ -63,6 +68,9 @@ class WatchMonitor:
         on_cycle_complete: Callable[..., None] | None = None,
     ) -> list[Finding]:
         """Evaluate rules on accumulated events and dispatch alerts."""
+        self.total_lines_streamed += lines_count
+        self.total_events_streamed += len(events)
+
         clusters = self.clusterer.get_clusters()
         findings = self.rule_engine.evaluate(events, clusters)
 
@@ -80,17 +88,25 @@ class WatchMonitor:
                 if self.notifier:
                     self.notifier.send_alert(f)
 
+            seen_ids = {af.id for af in self.all_findings}
+            for f in findings:
+                if f.id not in seen_ids:
+                    self.all_findings.append(f)
+                    seen_ids.add(f.id)
+
+        # Persist and update the live run in SQLite storage so the dashboard reflects live activity
+        if events:
             meta = ReportMetadata(
                 generated_at=datetime.now(UTC),
                 log_source=str(self.log_path),
-                total_lines=lines_count,
-                parsed_events=len(events),
-                unparsed_lines=lines_count - len(events),
+                total_lines=self.total_lines_streamed,
+                parsed_events=self.total_events_streamed,
+                unparsed_lines=max(0, self.total_lines_streamed - self.total_events_streamed),
                 total_clusters=len(clusters),
-                findings_count=len(findings),
+                findings_count=len(self.all_findings),
             )
-            report = Report(metadata=meta, findings=findings, clusters=clusters)
-            self.storage.save_run(report)
+            report = Report(metadata=meta, findings=self.all_findings, clusters=clusters)
+            self.storage.save_run(report, run_id=self.run_id)
 
         if on_cycle_complete:
             try:
@@ -206,6 +222,7 @@ class LiveSSHMonitor(WatchMonitor):
         storage: StorageManager | None = None,
         interval: float = 2.0,
         console: Console | None = None,
+        run_id: str | None = None,
     ) -> None:
         super().__init__(
             log_path=Path(source_label),
@@ -215,6 +232,7 @@ class LiveSSHMonitor(WatchMonitor):
             interval=interval,
             from_start=False,
             console=console,
+            run_id=run_id,
         )
         self.host = host
         self.port = port
@@ -378,6 +396,7 @@ class LiveWatchSession:
         self.last_activity = datetime.now(UTC)
         self.status = "ACTIVE"
         self.is_ssh = is_ssh
+        self.run_id = monitor.run_id
         self.error: str | None = None
 
 
@@ -403,6 +422,7 @@ class LiveWatchManager:
             raise FileNotFoundError(f"Target log file does not exist: {path}")
 
         session_id = f"watch-{uuid.uuid4().hex[:8]}"
+        run_id = f"run-live-{uuid.uuid4().hex[:8]}"
 
         def on_cycle(findings: list[Finding], lines_count: int = 0, events_count: int = 0) -> None:
             with self._lock:
@@ -432,6 +452,7 @@ class LiveWatchManager:
             storage=self.storage,
             interval=interval,
             from_start=from_start,
+            run_id=run_id,
         )
 
         def runner() -> None:
@@ -482,6 +503,7 @@ class LiveWatchManager:
     ) -> str:
         """Start a new background live watch monitor over SSH for a remote VPS."""
         session_id = f"watch-ssh-{uuid.uuid4().hex[:6]}"
+        run_id = f"run-live-{uuid.uuid4().hex[:8]}"
         last_logged_activity = 0.0
 
         def on_cycle(findings: list[Finding], lines_count: int = 0, events_count: int = 0) -> None:
@@ -532,6 +554,7 @@ class LiveWatchManager:
             notifier=notifier,
             storage=self.storage,
             interval=interval,
+            run_id=run_id,
         )
 
         def runner() -> None:
@@ -609,6 +632,7 @@ class LiveWatchManager:
                         "total_events": s.total_events,
                         "last_activity": s.last_activity.strftime("%Y-%m-%d %H:%M:%S UTC"),
                         "is_ssh": s.is_ssh,
+                        "run_id": s.run_id,
                         "error": s.error,
                     }
                 )
