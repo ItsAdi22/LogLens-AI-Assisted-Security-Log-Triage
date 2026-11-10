@@ -32,14 +32,14 @@
         Firewall rules
       </button>
       <a href="/api/runs/{{ run_id }}" class="btn btn-secondary btn-sm" target="_blank">Export JSON</a>
-      <form action="/runs/{{ run_id }}/delete" method="post" style="display: inline; margin: 0;" onsubmit="return confirm('Delete this triage run ({{ run_id }})?');">
+      <form action="/runs/{{ run_id }}/delete" method="post" style="display: inline; margin: 0;" data-confirm="Delete this triage run ({{ run_id }})? This action cannot be undone." data-confirm-title="Delete triage run" data-confirm-btn="Delete run">
         <button type="submit" class="btn btn-danger btn-sm">
           Delete run
         </button>
       </form>
     </div>
   </div>
-  <div id="run-alert-status" style="margin-top: 8px;"></div>
+  <div id="run-alert-status" style="margin-top: 10px;"></div>
 </div>
 
 <!-- Run Metadata Summary -->
@@ -105,7 +105,7 @@
     </div>
   {% else %}
     <div class="card" style="text-align: center; color: var(--text-muted); padding: 32px 16px;">
-      <p style="color: #6ee7b7; font-weight: 500; font-size: 14px;">No security findings detected</p>
+      <p style="color: var(--positive); font-weight: 500; font-size: 14px;">No security findings detected</p>
       <p style="font-size: 12px; margin-top: 4px;">This log file matched no intrusion signatures or unauthorized attack patterns</p>
     </div>
   {% endif %}
@@ -146,7 +146,7 @@
     </div>
   {% else %}
     <div class="card" style="text-align: center; color: var(--text-muted); padding: 28px 16px;">
-      <p style="color: #6ee7b7; font-weight: 500; font-size: 14px;">No application errors detected</p>
+      <p style="color: var(--positive); font-weight: 500; font-size: 14px;">No application errors detected</p>
       <p style="font-size: 12px; margin-top: 4px;">No fatal exceptions, database connection failures, or service crashes found</p>
     </div>
   {% endif %}
@@ -205,11 +205,11 @@
 </div>
 
 <!-- Firewall Drop Rules Modal -->
-<div id="firewall-modal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); z-index: 9999; align-items: center; justify-content: center; padding: 16px;">
-  <div class="card" style="width: 100%; max-width: 760px; max-height: 85vh; display: flex; flex-direction: column; background: var(--bg-surface); padding: 20px; border-radius: 8px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-      <h3 style="font-size: 15px; font-weight: 600;">Perimeter firewall drop rules</h3>
-      <button type="button" onclick="closeFirewallModal()" style="background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer;">&times;</button>
+<div id="firewall-modal" class="modal-backdrop" style="display: none;" onclick="if(event.target.id==='firewall-modal') closeFirewallModal();">
+  <div class="modal-dialog" style="max-width: 760px; max-height: 85vh; display: flex; flex-direction: column;">
+    <div class="modal-header">
+      <h3 class="modal-title">Perimeter firewall drop rules</h3>
+      <button type="button" class="modal-close" onclick="closeFirewallModal()">&times;</button>
     </div>
 
     <div style="display: flex; gap: 8px; margin-bottom: 14px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
@@ -220,14 +220,14 @@
     </div>
 
     <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
-      <div style="font-size: 11px; color: #f59e0b; margin-bottom: 8px;">
+      <div style="font-size: 11px; color: var(--warning); margin-bottom: 8px;">
         Review all IP addresses before applying. LogLens rules are advisory.
       </div>
-      <textarea id="firewall-rules-output" readonly rows="12" style="width: 100%; flex: 1; background: #0a0c10; color: var(--text-primary); font-family: var(--font-mono); font-size: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 6px; resize: none;"></textarea>
+      <textarea id="firewall-rules-output" readonly rows="12" style="width: 100%; flex: 1; background: var(--bg-code); color: var(--text-code); font-family: var(--font-mono); font-size: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 6px; resize: none;"></textarea>
     </div>
 
     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
-      <span id="copy-feedback" style="font-size: 12px; color: #10b981; font-weight: 500;"></span>
+      <span id="copy-feedback" style="font-size: 12px; color: var(--positive); font-weight: 500;"></span>
       <div style="display: flex; gap: 8px;">
         <button type="button" class="btn btn-primary btn-sm" onclick="copyFirewallRules()">
           Copy rules
@@ -282,11 +282,11 @@
 
   function copyFirewallRules() {
     const output = document.getElementById('firewall-rules-output');
-    navigator.clipboard.writeText(output.value).then(() => {
-      const fb = document.getElementById('copy-feedback');
-      fb.textContent = 'Copied to clipboard';
-      setTimeout(() => { fb.textContent = ''; }, 3000);
-    });
+    if (!output || !output.value || output.value.startsWith('Fetching')) return;
+    copyToClipboard(output.value, null, 'Firewall rules copied to clipboard');
+    const fb = document.getElementById('copy-feedback');
+    fb.textContent = 'Copied to clipboard';
+    setTimeout(() => { fb.textContent = ''; }, 3000);
   }
 
   function toggleFindingsLayout() {

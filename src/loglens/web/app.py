@@ -649,19 +649,19 @@ def create_app(
             delivered = notif.send_alert(test_finding)
             if delivered:
                 return HTMLResponse(
-                    '<span style="color: #10b981; font-weight: 600; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.25rem;">'
+                    '<span class="alert-status-badge alert-success">'
                     "<span>✓</span> Test Notification Delivered Successfully!"
                     "</span>"
                 )
             else:
                 return HTMLResponse(
-                    '<span style="color: #ef4444; font-weight: 600; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.25rem;">'
+                    '<span class="alert-status-badge alert-error">'
                     "<span>✗</span> Delivery Failed — Check credentials & chat/webhook permissions."
                     "</span>"
                 )
         except Exception as exc:
             return HTMLResponse(
-                f'<span style="color: #ef4444; font-weight: 600; font-size: 0.85rem;">'
+                f'<span class="alert-status-badge alert-error">'
                 f"<span>✗</span> Error: {html.escape(str(exc))}"
                 f"</span>"
             )
@@ -709,16 +709,16 @@ def create_app(
             if delivered:
                 msg = f"✓ Run digest dispatched to {channel.capitalize()}!"
                 return HTMLResponse(
-                    f'<span style="color: #10b981; font-weight: 600; font-size: 0.85rem; border: 1px solid #10b981; padding: 0.25rem 0.5rem; border-radius: 4px; background: rgba(16, 185, 129, 0.1);">{msg}</span>'
+                    f'<span class="alert-status-badge alert-success">{msg}</span>'
                 )
             else:
                 msg = f"✗ Failed sending to {channel.capitalize()} (unconfigured or rejected)."
                 return HTMLResponse(
-                    f'<span style="color: #ef4444; font-weight: 600; font-size: 0.85rem; border: 1px solid #ef4444; padding: 0.25rem 0.5rem; border-radius: 4px; background: rgba(239, 68, 68, 0.1);">{msg}</span>'
+                    f'<span class="alert-status-badge alert-error">{msg}</span>'
                 )
         except Exception as exc:
             return HTMLResponse(
-                f'<span style="color: #ef4444; font-weight: 600; font-size: 0.85rem;">Error: {html.escape(str(exc))}</span>'
+                f'<span class="alert-status-badge alert-error">Error: {html.escape(str(exc))}</span>'
             )
 
     @app.post(
@@ -750,16 +750,16 @@ def create_app(
             if delivered:
                 msg = f"✓ Finding alert delivered to {channel.capitalize()}!"
                 return HTMLResponse(
-                    f'<span style="color: #10b981; font-weight: 600; font-size: 0.8rem; border: 1px solid #10b981; padding: 0.2rem 0.4rem; border-radius: 4px; background: rgba(16, 185, 129, 0.1);">{msg}</span>'
+                    f'<span class="alert-status-badge alert-success">{msg}</span>'
                 )
             else:
                 msg = f"✗ Delivery to {channel.capitalize()} failed. Check settings."
                 return HTMLResponse(
-                    f'<span style="color: #ef4444; font-weight: 600; font-size: 0.8rem; border: 1px solid #ef4444; padding: 0.2rem 0.4rem; border-radius: 4px; background: rgba(239, 68, 68, 0.1);">{msg}</span>'
+                    f'<span class="alert-status-badge alert-error">{msg}</span>'
                 )
         except Exception as exc:
             return HTMLResponse(
-                f'<span style="color: #ef4444; font-weight: 600; font-size: 0.8rem;">Error: {html.escape(str(exc))}</span>'
+                f'<span class="alert-status-badge alert-error">Error: {html.escape(str(exc))}</span>'
             )
 
     @app.post(
@@ -807,16 +807,16 @@ def create_app(
             if delivered:
                 msg = f"✓ Error alert sent to {channel.capitalize()}!"
                 return HTMLResponse(
-                    f'<span style="color: #10b981; font-weight: 600; font-size: 0.8rem; border: 1px solid #10b981; padding: 0.2rem 0.4rem; border-radius: 4px; background: rgba(16, 185, 129, 0.1);">{msg}</span>'
+                    f'<span class="alert-status-badge alert-success">{msg}</span>'
                 )
             else:
                 msg = f"✗ Delivery to {channel.capitalize()} failed."
                 return HTMLResponse(
-                    f'<span style="color: #ef4444; font-weight: 600; font-size: 0.8rem; border: 1px solid #ef4444; padding: 0.2rem 0.4rem; border-radius: 4px; background: rgba(239, 68, 68, 0.1);">{msg}</span>'
+                    f'<span class="alert-status-badge alert-error">{msg}</span>'
                 )
         except Exception as exc:
             return HTMLResponse(
-                f'<span style="color: #ef4444; font-weight: 600; font-size: 0.8rem;">Error: {html.escape(str(exc))}</span>'
+                f'<span class="alert-status-badge alert-error">Error: {html.escape(str(exc))}</span>'
             )
 
     @app.get(

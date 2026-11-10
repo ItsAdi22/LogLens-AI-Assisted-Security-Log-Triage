@@ -72,7 +72,7 @@
               <div style="font-size: 11px; color: var(--text-muted); font-weight: 500; margin-bottom: 2px;">
                 Remediation:
               </div>
-              <ul style="padding-left: 18px; font-size: 12px; color: #6ee7b7; margin: 0;">
+              <ul style="padding-left: 18px; font-size: 12px; color: var(--positive); margin: 0;">
                 {% for act in finding.llm.recommended_actions[:2] %}
                   <li>{{ act }}</li>
                 {% endfor %}

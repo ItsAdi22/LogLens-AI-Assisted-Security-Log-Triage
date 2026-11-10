@@ -6,14 +6,25 @@
   <meta name="description" content="LogLens - Security Log Triage and Automated Threat Detection">
   <title>{% block title %}LogLens{% endblock %}</title>
   <script src="/static/js/htmx.min.js"></script>
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem('loglens-theme');
+        var pref = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', saved || pref);
+      } catch(e) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
   <style>
-    :root {
+    :root, [data-theme="dark"] {
       --bg-page: #0d0f12;
       --bg-surface: #13161c;
       --bg-card: #181b22;
       --bg-raised: #1f232d;
       --border: rgba(255, 255, 255, 0.08);
-      --border-strong: rgba(255, 255, 255, 0.14);
+      --border-strong: rgba(255, 255, 255, 0.16);
       --border-focus: rgba(56, 189, 248, 0.4);
       --text-primary: #ededf0;
       --text-secondary: #9aa0ac;
@@ -21,8 +32,54 @@
       --accent: #38bdf8;
       --accent-hover: #0ea5e9;
       --accent-dim: rgba(56, 189, 248, 0.1);
+      --bg-code: #0a0c10;
+      --text-code: #cbd5e1;
+      --btn-primary-bg: #ededf0;
+      --btn-primary-text: #0f1115;
+      --btn-primary-hover: #ffffff;
+      --btn-secondary-bg: var(--bg-card);
+      --btn-secondary-hover: var(--bg-raised);
+      --modal-scrim: rgba(0, 0, 0, 0.75);
+      --card-shadow: none;
+      --positive: #10b981;
+      --positive-dim: rgba(16, 185, 129, 0.12);
+      --danger: #ef4444;
+      --danger-dim: rgba(239, 68, 68, 0.12);
+      --warning: #f59e0b;
+      --warning-dim: rgba(245, 158, 11, 0.12);
       --font-mono: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, "JetBrains Mono", monospace;
       --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, -apple-system, sans-serif;
+    }
+
+    [data-theme="light"] {
+      --bg-page: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-card: #f8fafc;
+      --bg-raised: #f1f5f9;
+      --border: #e2e8f0;
+      --border-strong: #cbd5e1;
+      --border-focus: #0284c7;
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #64748b;
+      --accent: #0284c7;
+      --accent-hover: #0369a1;
+      --accent-dim: rgba(2, 132, 199, 0.08);
+      --bg-code: #f1f5f9;
+      --text-code: #1e293b;
+      --btn-primary-bg: #0f172a;
+      --btn-primary-text: #ffffff;
+      --btn-primary-hover: #1e293b;
+      --btn-secondary-bg: #f8fafc;
+      --btn-secondary-hover: #f1f5f9;
+      --modal-scrim: rgba(15, 23, 42, 0.5);
+      --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+      --positive: #16a34a;
+      --positive-dim: rgba(22, 163, 74, 0.1);
+      --danger: #dc2626;
+      --danger-dim: rgba(220, 38, 38, 0.1);
+      --warning: #d97706;
+      --warning-dim: rgba(217, 119, 6, 0.1);
     }
 
     *, *::before, *::after {
@@ -43,6 +100,7 @@
       display: flex;
       flex-direction: column;
       -webkit-font-smoothing: antialiased;
+      transition: background-color 0.15s ease, color 0.15s ease;
     }
 
     header {
@@ -56,6 +114,7 @@
       position: sticky;
       top: 0;
       z-index: 50;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
     }
 
     .brand {
@@ -86,7 +145,7 @@
 
     nav {
       display: flex;
-      gap: 20px;
+      gap: 16px;
       align-items: center;
     }
 
@@ -105,6 +164,32 @@
     nav a.active {
       color: var(--accent);
     }
+
+    .theme-toggle {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text-secondary);
+      transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+      padding: 0;
+    }
+
+    .theme-toggle:hover {
+      background: var(--bg-raised);
+      color: var(--text-primary);
+      border-color: var(--border-strong);
+    }
+
+    [data-theme="dark"] .sun-icon { display: block; }
+    [data-theme="dark"] .moon-icon { display: none; }
+    [data-theme="light"] .sun-icon { display: none; }
+    [data-theme="light"] .moon-icon { display: block; }
 
     main {
       flex: 1;
@@ -131,6 +216,8 @@
       padding: 20px;
       margin-bottom: 20px;
       min-width: 0;
+      box-shadow: var(--card-shadow);
+      transition: background-color 0.15s ease, border-color 0.15s ease;
     }
 
     .card-header {
@@ -196,11 +283,11 @@
       letter-spacing: 0.03em;
     }
 
-    .badge-critical { background: rgba(239, 68, 68, 0.12); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25); }
-    .badge-high { background: rgba(249, 115, 22, 0.12); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.25); }
-    .badge-medium { background: rgba(234, 179, 8, 0.12); color: #fde047; border: 1px solid rgba(234, 179, 8, 0.25); }
-    .badge-low { background: rgba(56, 189, 248, 0.12); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.25); }
-    .badge-info { background: rgba(100, 116, 139, 0.12); color: #94a3b8; border: 1px solid rgba(100, 116, 139, 0.25); }
+    .badge-critical { background: var(--danger-dim); color: var(--danger); border: 1px solid var(--danger); }
+    .badge-high { background: rgba(249, 115, 22, 0.12); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.3); }
+    .badge-medium { background: var(--warning-dim); color: var(--warning); border: 1px solid var(--warning); }
+    .badge-low { background: var(--accent-dim); color: var(--accent); border: 1px solid var(--accent); }
+    .badge-info { background: rgba(100, 116, 139, 0.12); color: var(--text-muted); border: 1px solid var(--border-strong); }
 
     .btn {
       display: inline-flex;
@@ -220,13 +307,13 @@
     }
 
     .btn-primary {
-      background: var(--text-primary);
-      color: #0f1115;
-      border-color: var(--text-primary);
+      background: var(--btn-primary-bg);
+      color: var(--btn-primary-text);
+      border-color: var(--btn-primary-bg);
     }
     .btn-primary:hover {
-      background: #e2e4e9;
-      border-color: #e2e4e9;
+      background: var(--btn-primary-hover);
+      border-color: var(--btn-primary-hover);
     }
 
     .btn-accent {
@@ -240,19 +327,19 @@
     }
 
     .btn-secondary {
-      background: var(--bg-card);
+      background: var(--btn-secondary-bg);
       color: var(--text-primary);
       border: 1px solid var(--border);
     }
     .btn-secondary:hover {
-      background: var(--bg-raised);
+      background: var(--btn-secondary-hover);
       border-color: var(--border-strong);
     }
 
     .btn-danger {
-      background: rgba(239, 68, 68, 0.1);
-      color: #f87171;
-      border: 1px solid rgba(239, 68, 68, 0.25);
+      background: var(--danger-dim);
+      color: var(--danger);
+      border: 1px solid var(--danger);
     }
     .btn-danger:hover {
       background: rgba(239, 68, 68, 0.2);
@@ -290,15 +377,15 @@
       padding: 2px 5px;
       border-radius: 4px;
       border: 1px solid var(--border);
-      color: #e2e8f0;
+      color: var(--text-primary);
     }
 
     pre {
-      background: #0a0c10;
+      background: var(--bg-code);
       border: 1px solid var(--border);
       border-radius: 6px;
       padding: 10px 12px;
-      color: #cbd5e1;
+      color: var(--text-code);
       overflow-x: auto;
       white-space: pre-wrap;
       word-break: break-all;
@@ -332,7 +419,7 @@
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      background: #10b981;
+      background: var(--positive);
       display: inline-block;
     }
 
@@ -343,10 +430,179 @@
       display: inline-block;
     }
 
+    /* Proper Alerts UI: Badges, Banners, Toasts, and Modals */
+    .alert-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: all 0.15s;
+    }
+    .alert-status-badge.alert-success {
+      background: var(--positive-dim);
+      color: var(--positive);
+      border: 1px solid var(--positive);
+    }
+    .alert-status-badge.alert-error {
+      background: var(--danger-dim);
+      color: var(--danger);
+      border: 1px solid var(--danger);
+    }
+
+    .alert-banner {
+      padding: 10px 14px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+    .alert-banner.alert-success {
+      background: var(--positive-dim);
+      border: 1px solid var(--positive);
+      color: var(--positive);
+    }
+    .alert-banner.alert-error {
+      background: var(--danger-dim);
+      border: 1px solid var(--danger);
+      color: var(--danger);
+    }
+
+    /* Modal System */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: var(--modal-scrim);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      animation: modalFadeIn 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .modal-dialog {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-strong);
+      border-radius: 8px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+      width: 100%;
+      max-width: 440px;
+      padding: 20px;
+      animation: modalSlideUp 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .modal-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .modal-close:hover {
+      color: var(--text-primary);
+    }
+    .modal-body {
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    @keyframes modalFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes modalSlideUp {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Toast Notification Container */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 1100;
+      pointer-events: none;
+    }
+    .toast {
+      pointer-events: auto;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-strong);
+      border-radius: 6px;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--text-primary);
+      min-width: 260px;
+      max-width: 420px;
+      animation: toastSlideIn 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    .toast-success { border-left: 3px solid var(--positive); }
+    .toast-error { border-left: 3px solid var(--danger); }
+    .toast-info { border-left: 3px solid var(--accent); }
+    .toast-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .toast-dot.success { background: var(--positive); }
+    .toast-dot.error { background: var(--danger); }
+    .toast-dot.info { background: var(--accent); }
+    .toast-text {
+      flex: 1;
+    }
+    .toast-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 4px;
+    }
+    .toast-close:hover {
+      color: var(--text-primary);
+    }
+    @keyframes toastSlideIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
     @media (max-width: 860px) {
       header { padding: 0 16px; }
       main { padding: 16px; }
-      nav { gap: 12px; }
+      nav { gap: 10px; }
       .metric-grid { grid-template-columns: 1fr 1fr; }
     }
   </style>
@@ -362,9 +618,25 @@
       <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a>
       <a href="/live" class="{% if request.url.path.startswith('/live') %}active{% endif %}">Live monitor</a>
       <a href="/analyze" class="{% if request.url.path.startswith('/analyze') %}active{% endif %}">New analysis</a>
-      <a href="/settings" class="{% if request.url.path.startswith('/settings') %}active{% endif %}">Settings</a>
+      <a href="/settings" class="{% if request.url.path.startswith('/settings') %}active{% endif %}">Alerts &amp; settings</a>
       <a href="/api/stats" target="_blank">API stats</a>
       <a href="https://github.com/ItsAdi22/LogLens-AI-Assisted-Security-Log-Triage" target="_blank" rel="noopener">GitHub</a>
+      <button type="button" id="theme-toggle" class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle dark/light theme" title="Toggle theme">
+        <svg class="sun-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+        <svg class="moon-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+      </button>
     </nav>
   </header>
 
@@ -375,5 +647,153 @@
   <footer>
     LogLens v1.0.0 &bull; Local-first security log triage
   </footer>
+
+  <!-- Custom Confirmation Modal (replacing native browser alert/confirm) -->
+  <div id="confirm-modal" class="modal-backdrop" style="display: none;" onclick="handleModalBackdropClick(event)">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="live-dot" style="background: var(--danger);"></span>
+          <h3 id="confirm-modal-title" class="modal-title">Confirm action</h3>
+        </div>
+        <button type="button" class="modal-close" onclick="closeConfirmModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="confirm-modal-message">Are you sure you want to proceed?</p>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="closeConfirmModal()">Cancel</button>
+        <button type="button" id="confirm-modal-ok-btn" class="btn btn-danger btn-sm">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <script>
+    function toggleTheme() {
+      var cur = document.documentElement.getAttribute('data-theme') || 'dark';
+      var next = cur === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('loglens-theme', next); } catch(e) {}
+      showToast('Theme switched to ' + (next === 'dark' ? 'Dark' : 'Light') + ' mode', 'info', 2000);
+    }
+
+    // Toast System
+    function showToast(message, type, duration) {
+      type = type || 'info';
+      duration = duration || 3500;
+      var container = document.getElementById('toast-container');
+      if (!container) return;
+      var toast = document.createElement('div');
+      toast.className = 'toast toast-' + type;
+      toast.innerHTML = '<span class="toast-dot ' + type + '"></span><span class="toast-text">' + message + '</span><button type="button" class="toast-close" onclick="this.parentElement.remove()">&times;</button>';
+      container.appendChild(toast);
+      setTimeout(function() {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(8px)';
+        setTimeout(function() { toast.remove(); }, 200);
+      }, duration);
+    }
+
+    // Custom Modal Confirmation System
+    var pendingConfirmCallback = null;
+    function showConfirmModal(opts) {
+      var title = opts.title || 'Confirm action';
+      var message = opts.message || 'Are you sure?';
+      var confirmText = opts.confirmText || 'Confirm';
+      var isDanger = opts.danger !== false;
+
+      document.getElementById('confirm-modal-title').textContent = title;
+      document.getElementById('confirm-modal-message').textContent = message;
+      var okBtn = document.getElementById('confirm-modal-ok-btn');
+      okBtn.textContent = confirmText;
+      okBtn.className = isDanger ? 'btn btn-danger btn-sm' : 'btn btn-primary btn-sm';
+
+      pendingConfirmCallback = opts.onConfirm || null;
+      var modal = document.getElementById('confirm-modal');
+      modal.style.display = 'flex';
+      okBtn.focus();
+    }
+
+    function closeConfirmModal() {
+      var modal = document.getElementById('confirm-modal');
+      if (modal) modal.style.display = 'none';
+      pendingConfirmCallback = null;
+    }
+
+    function handleModalBackdropClick(e) {
+      if (e.target && e.target.id === 'confirm-modal') {
+        closeConfirmModal();
+      }
+    }
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeConfirmModal();
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+      var okBtn = document.getElementById('confirm-modal-ok-btn');
+      if (okBtn) {
+        okBtn.addEventListener('click', function() {
+          if (typeof pendingConfirmCallback === 'function') {
+            var cb = pendingConfirmCallback;
+            closeConfirmModal();
+            cb();
+          } else {
+            closeConfirmModal();
+          }
+        });
+      }
+
+      // Intercept forms with data-confirm
+      document.body.addEventListener('submit', function(e) {
+        var form = e.target;
+        if (!form || !form.getAttribute) return;
+        var confirmMsg = form.getAttribute('data-confirm');
+        if (confirmMsg && !form.dataset.confirmed) {
+          e.preventDefault();
+          var title = form.getAttribute('data-confirm-title') || 'Confirm deletion';
+          var actionText = form.getAttribute('data-confirm-btn') || 'Confirm';
+          showConfirmModal({
+            title: title,
+            message: confirmMsg,
+            confirmText: actionText,
+            danger: true,
+            onConfirm: function() {
+              form.dataset.confirmed = 'true';
+              form.submit();
+            }
+          });
+        }
+      });
+
+      // Listen to HTMX afterOnLoad for alert responses
+      document.body.addEventListener('htmx:afterOnLoad', function(evt) {
+        if (evt.detail && evt.detail.target && evt.detail.target.id && evt.detail.target.id.indexOf('alert-status') !== -1) {
+          var text = evt.detail.target.innerText.trim();
+          if (text) {
+            var isSuccess = text.indexOf('✓') !== -1;
+            showToast(text, isSuccess ? 'success' : 'error');
+          }
+        }
+      });
+    });
+
+    function copyToClipboard(text, btnElement, feedbackMsg) {
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(function() {
+        showToast(feedbackMsg || 'Copied to clipboard', 'success', 2500);
+        if (btnElement) {
+          var originalText = btnElement.innerText;
+          btnElement.innerText = 'Copied!';
+          setTimeout(function() { btnElement.innerText = originalText; }, 2000);
+        }
+      }).catch(function() {
+        showToast('Failed to copy to clipboard', 'error');
+      });
+    }
+  </script>
 </body>
 </html>

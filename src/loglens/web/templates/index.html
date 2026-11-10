@@ -11,10 +11,10 @@
   <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
     <a href="/analyze" class="btn btn-primary btn-sm">+ New analysis</a>
     <a href="/live" class="btn btn-secondary btn-sm">Live monitor</a>
-    <a href="/settings" class="btn btn-secondary btn-sm">Settings</a>
+    <a href="/settings" class="btn btn-secondary btn-sm">Alerts &amp; settings</a>
     <a href="/api/runs" class="btn btn-secondary btn-sm" target="_blank">Export JSON</a>
     {% if runs %}
-      <form action="/api/runs/clear" method="post" style="display: inline; margin: 0;" onsubmit="return confirm('Clear all triage runs and security findings? This cannot be undone.');">
+      <form action="/api/runs/clear" method="post" style="display: inline; margin: 0;" data-confirm="Clear all historical triage runs and security findings? This cannot be undone." data-confirm-title="Clear all runs" data-confirm-btn="Clear all">
         <button type="submit" class="btn btn-danger btn-sm">
           Clear all runs
         </button>
@@ -145,7 +145,7 @@
                   <a href="/runs/{{ run.run_id }}" class="btn btn-secondary btn-sm">
                     Inspect
                   </a>
-                  <form action="/runs/{{ run.run_id }}/delete" method="post" style="display: inline; margin: 0;" onsubmit="return confirm('Delete run {{ run.run_id }}?');">
+                  <form action="/runs/{{ run.run_id }}/delete" method="post" style="display: inline; margin: 0;" data-confirm="Delete triage run {{ run.run_id }}? This action cannot be undone." data-confirm-title="Delete run" data-confirm-btn="Delete">
                     <button type="submit" class="btn btn-danger btn-sm" title="Delete run">
                       Delete
                     </button>

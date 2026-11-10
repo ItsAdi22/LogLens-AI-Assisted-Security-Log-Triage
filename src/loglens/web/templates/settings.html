@@ -12,7 +12,7 @@
   </div>
 
   {% if saved %}
-    <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); color: #6ee7b7; padding: 10px 14px; border-radius: 6px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; font-size: 13px;">
+    <div class="alert-banner alert-success">
       <span class="live-dot"></span>
       <span>Settings saved successfully. Changes are now active.</span>
     </div>
@@ -198,13 +198,13 @@
   </form>
 
   <!-- Database & Storage Management Card -->
-  <div class="card" style="border-color: rgba(239, 68, 68, 0.2);">
+  <div class="card" style="border-color: var(--danger-dim);">
     <div class="card-header" style="margin-bottom: 0;">
       <div>
-        <h2 class="card-title" style="color: #f87171;">Database maintenance</h2>
+        <h2 class="card-title" style="color: var(--danger);">Database maintenance</h2>
         <p class="card-subtitle">Permanently delete historical triage runs, clusters, and security findings from local storage</p>
       </div>
-      <form action="/api/runs/clear" method="post" style="margin: 0;" onsubmit="return confirm('Permanently clear all stored runs and findings?');">
+      <form action="/api/runs/clear" method="post" style="margin: 0;" data-confirm="Permanently clear all stored runs and findings? This action cannot be undone." data-confirm-title="Clear all runs" data-confirm-btn="Clear all">
         <button type="submit" class="btn btn-danger btn-sm">
           Clear all runs
         </button>

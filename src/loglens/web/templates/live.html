@@ -137,12 +137,12 @@
   </div>
 </div>
 
-<!-- Section 3: Connect Remote VPS & Panels (Pterodactyl, Pelican, Docker) -->
+<!-- Section 3: Connect Remote VPS & Panels (Pelican, Pterodactyl, Docker) -->
 <div class="card">
-  <div class="card-header" style="margin-bottom: 12px;">
+  <div class="card-header" style="margin-bottom: 16px;">
     <div>
       <h2 class="card-title">Remote server forwarding</h2>
-      <p class="card-subtitle">Pipe logs from external VPS hosts, containers, or game panels into LogLens via HTTP</p>
+      <p class="card-subtitle">Pipe live streams from your VPS, Docker Compose containers, or game panels into LogLens</p>
     </div>
     <div>
       <span class="code" style="font-size: 11px;">POST /api/ingest/stream</span>
@@ -150,34 +150,90 @@
   </div>
 
   <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap: 16px;">
-    <!-- Box 1: Pterodactyl & Pelican Logs -->
+    <!-- Box 1: Pelican Panel (Docker Compose) -->
     <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 14px; min-width: 0;">
-      <div style="font-weight: 500; font-size: 13px; margin-bottom: 4px; color: var(--text-primary);">
-        Pterodactyl &amp; Pelican panel logs
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+        <div style="font-weight: 600; font-size: 13px; color: var(--text-primary);">
+          Pelican panel (Docker Compose)
+        </div>
+        <span class="badge badge-low" style="font-size: 10px;">~/pelican-panel</span>
       </div>
       <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
-        Pipe panel logs in real time from your game server VPS:
+        Run inside your Pelican directory (<span class="code">cd ~/pelican-panel</span>) to forward live logs:
       </p>
-      <pre>tail -F /var/www/pterodactyl/storage/logs/laravel-$(date +%Y-%m-%d).log | curl -s -X POST http://&lt;HOST&gt;:8080/api/ingest/stream -H "X-Log-Source: pterodactyl-panel" -T -</pre>
-      <div style="font-size: 12px; color: var(--text-secondary); margin: 10px 0 4px 0;">
-        Or for Pelican / Wings Docker daemon:
+
+      <!-- App / Laravel live logs -->
+      <div style="margin-bottom: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <span style="font-size: 11px; color: var(--text-muted); font-weight: 500;">Pelican app stream:</span>
+          <button type="button" class="btn btn-secondary btn-sm" style="height: 20px; font-size: 10px; padding: 0 6px;"
+                  onclick="copyToClipboard('cd ~/pelican-panel && docker compose logs -f --tail=50 app | curl -s -X POST http://<YOUR_IP>:8080/api/ingest/stream -H &quot;X-Log-Source: pelican-panel&quot; -T -', this)">Copy</button>
+        </div>
+        <pre>cd ~/pelican-panel && docker compose logs -f --tail=50 app | curl -s -X POST http://&lt;YOUR_IP&gt;:8080/api/ingest/stream -H "X-Log-Source: pelican-panel" -T -</pre>
       </div>
-      <pre>docker logs -f pterodactyl-wings | curl -s -X POST http://&lt;HOST&gt;:8080/api/ingest/stream -H "X-Log-Source: pterodactyl-wings" -T -</pre>
+
+      <!-- Container Laravel log file -->
+      <div style="margin-bottom: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <span style="font-size: 11px; color: var(--text-muted); font-weight: 500;">Laravel error log file:</span>
+          <button type="button" class="btn btn-secondary btn-sm" style="height: 20px; font-size: 10px; padding: 0 6px;"
+                  onclick="copyToClipboard('cd ~/pelican-panel && docker compose exec -T app tail -F storage/logs/laravel-$(date +%Y-%m-%d).log | curl -s -X POST http://<YOUR_IP>:8080/api/ingest/stream -H &quot;X-Log-Source: pelican-panel&quot; -T -', this)">Copy</button>
+        </div>
+        <pre>cd ~/pelican-panel && docker compose exec -T app tail -F storage/logs/laravel-$(date +%Y-%m-%d).log | curl -s -X POST http://&lt;YOUR_IP&gt;:8080/api/ingest/stream -H "X-Log-Source: pelican-panel" -T -</pre>
+      </div>
+
+      <!-- Caddy reverse proxy logs -->
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <span style="font-size: 11px; color: var(--text-muted); font-weight: 500;">Caddy web server logs:</span>
+          <button type="button" class="btn btn-secondary btn-sm" style="height: 20px; font-size: 10px; padding: 0 6px;"
+                  onclick="copyToClipboard('cd ~/pelican-panel && docker compose logs -f --tail=50 caddy | curl -s -X POST http://<YOUR_IP>:8080/api/ingest/stream -H &quot;X-Log-Source: pelican-caddy&quot; -T -', this)">Copy</button>
+        </div>
+        <pre>cd ~/pelican-panel && docker compose logs -f --tail=50 caddy | curl -s -X POST http://&lt;YOUR_IP&gt;:8080/api/ingest/stream -H "X-Log-Source: pelican-caddy" -T -</pre>
+      </div>
     </div>
 
-    <!-- Box 2: Linux SSH / Nginx / Syslog Forwarder -->
+    <!-- Box 2: Wings Node & Linux Host -->
     <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 14px; min-width: 0;">
-      <div style="font-weight: 500; font-size: 13px; margin-bottom: 4px; color: var(--text-primary);">
-        Linux SSH &amp; web access logs
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+        <div style="font-weight: 600; font-size: 13px; color: var(--text-primary);">
+          Wings daemon &amp; Linux servers
+        </div>
+        <span class="badge badge-info" style="font-size: 10px;">Host &amp; Daemons</span>
       </div>
       <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
-        Forward SSH auth failures or web proxy access logs:
+        Forward game node daemons or Linux system authentication logs:
       </p>
-      <pre>tail -F /var/log/auth.log | curl -s -X POST http://&lt;HOST&gt;:8080/api/ingest/stream -H "X-Log-Source: vps-auth.log" -T -</pre>
-      <div style="font-size: 12px; color: var(--text-secondary); margin: 10px 0 4px 0;">
-        For Nginx or reverse proxy logs:
+
+      <!-- Wings daemon -->
+      <div style="margin-bottom: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <span style="font-size: 11px; color: var(--text-muted); font-weight: 500;">Wings game server daemon:</span>
+          <button type="button" class="btn btn-secondary btn-sm" style="height: 20px; font-size: 10px; padding: 0 6px;"
+                  onclick="copyToClipboard('docker logs -f --tail=50 wings | curl -s -X POST http://<YOUR_IP>:8080/api/ingest/stream -H &quot;X-Log-Source: pelican-wings&quot; -T -', this)">Copy</button>
+        </div>
+        <pre>docker logs -f --tail=50 wings | curl -s -X POST http://&lt;YOUR_IP&gt;:8080/api/ingest/stream -H "X-Log-Source: pelican-wings" -T -</pre>
       </div>
-      <pre>tail -F /var/log/nginx/access.log | curl -s -X POST http://&lt;HOST&gt;:8080/api/ingest/stream -H "X-Log-Source: nginx-access.log" -T -</pre>
+
+      <!-- Linux SSH auth.log -->
+      <div style="margin-bottom: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <span style="font-size: 11px; color: var(--text-muted); font-weight: 500;">Linux SSH auth failures:</span>
+          <button type="button" class="btn btn-secondary btn-sm" style="height: 20px; font-size: 10px; padding: 0 6px;"
+                  onclick="copyToClipboard('tail -F /var/log/auth.log | curl -s -X POST http://<YOUR_IP>:8080/api/ingest/stream -H &quot;X-Log-Source: vps-auth.log&quot; -T -', this)">Copy</button>
+        </div>
+        <pre>tail -F /var/log/auth.log | curl -s -X POST http://&lt;YOUR_IP&gt;:8080/api/ingest/stream -H "X-Log-Source: vps-auth.log" -T -</pre>
+      </div>
+
+      <!-- Standalone Pterodactyl panel -->
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <span style="font-size: 11px; color: var(--text-muted); font-weight: 500;">Traditional /var/www/pterodactyl:</span>
+          <button type="button" class="btn btn-secondary btn-sm" style="height: 20px; font-size: 10px; padding: 0 6px;"
+                  onclick="copyToClipboard('tail -F /var/www/pterodactyl/storage/logs/laravel-$(date +%Y-%m-%d).log | curl -s -X POST http://<YOUR_IP>:8080/api/ingest/stream -H &quot;X-Log-Source: pterodactyl-panel&quot; -T -', this)">Copy</button>
+        </div>
+        <pre>tail -F /var/www/pterodactyl/storage/logs/laravel-$(date +%Y-%m-%d).log | curl -s -X POST http://&lt;YOUR_IP&gt;:8080/api/ingest/stream -H "X-Log-Source: pterodactyl-panel" -T -</pre>
+      </div>
     </div>
   </div>
 </div>
