@@ -18,55 +18,141 @@
   </div>
 </div>
 
-<!-- Section 1: Local Watch Starter & Active Watchers -->
+<!-- Section 1: Watch Starter & Active Watchers -->
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 1fr)); gap: 16px; margin-bottom: 24px;">
-  <!-- Start Local / Server File Watch -->
+  <!-- Start Remote SSH Watch / Local File Watch -->
   <div class="card" style="margin-bottom: 0;">
-    <div class="card-header">
+    <div class="card-header" style="margin-bottom: 12px;">
       <div>
-        <h2 class="card-title">Watch local log file</h2>
-        <p class="card-subtitle">Tails a file on this server and clusters new events</p>
+        <h2 class="card-title">Connect &amp; watch logs</h2>
+        <p class="card-subtitle">Stream live logs directly from a remote VPS or tail a local file</p>
       </div>
     </div>
 
-    <form action="/live/start" method="post">
-      <div style="margin-bottom: 16px;">
-        <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-weight: 500;">
-          File path
-        </label>
-        <input type="text" name="log_path" required
-               placeholder="/var/log/auth.log or /var/www/pterodactyl/storage/logs/laravel.log"
-               style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
-        <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; align-items: center;">
-          <span style="font-size: 11px; color: var(--text-muted);">Presets:</span>
-          <a href="#" onclick="document.querySelector('input[name=log_path]').value='/var/log/auth.log'; return false;" style="font-size: 11px; color: var(--accent); text-decoration: none;">auth.log</a>
-          <span style="color: var(--border-strong);">&bull;</span>
-          <a href="#" onclick="document.querySelector('input[name=log_path]').value='/var/log/nginx/access.log'; return false;" style="font-size: 11px; color: var(--accent); text-decoration: none;">nginx access.log</a>
-          <span style="color: var(--border-strong);">&bull;</span>
-          <a href="#" onclick="document.querySelector('input[name=log_path]').value='/var/www/pterodactyl/storage/logs/laravel.log'; return false;" style="font-size: 11px; color: var(--accent); text-decoration: none;">Pterodactyl laravel.log</a>
-        </div>
-      </div>
+    <!-- Mode Selector Radio Pills -->
+    <div style="display: flex; gap: 16px; margin-bottom: 14px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+      <label style="cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--text-primary);">
+        <input type="radio" name="watch_mode" value="ssh" checked onclick="switchWatchMode('ssh')" style="accent-color: var(--accent);">
+        <span>Remote VPS (SSH stream)</span>
+      </label>
+      <label style="cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--text-secondary);">
+        <input type="radio" name="watch_mode" value="local" onclick="switchWatchMode('local')" style="accent-color: var(--accent);">
+        <span>Watch local file</span>
+      </label>
+    </div>
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
-        <div>
-          <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-weight: 500;">
-            Poll interval (seconds)
-          </label>
-          <input type="number" name="interval" value="2.0" step="0.5" min="0.5" max="60.0"
-                 style="width: 100%; font-variant-numeric: tabular-nums;">
+    <!-- Remote VPS SSH Stream Form -->
+    <div id="ssh-watch-section">
+      <form action="/live/ssh/start" method="post">
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 10px;">
+          <div>
+            <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">
+              VPS IP / Host
+            </label>
+            <input type="text" name="host" required placeholder="e.g. 222.167.207.101" style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">
+              SSH port
+            </label>
+            <input type="number" name="port" value="22" min="1" max="65535" style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+          </div>
         </div>
-        <div style="display: flex; align-items: flex-end; padding-bottom: 8px;">
-          <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); cursor: pointer;">
-            <input type="checkbox" name="from_start" value="true" style="accent-color: var(--accent);">
-            <span>Scan from start</span>
-          </label>
-        </div>
-      </div>
 
-      <button type="submit" class="btn btn-primary" style="width: 100%;">
-        Start watch
-      </button>
-    </form>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+          <div>
+            <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">
+              Username
+            </label>
+            <input type="text" name="username" value="root" required style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">
+              Password
+            </label>
+            <input type="password" name="password" placeholder="Root / user password" style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+          </div>
+        </div>
+
+        <div style="margin-bottom: 10px;">
+          <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">
+            Target log source preset
+          </label>
+          <select name="preset" id="ssh-preset-select" onchange="toggleCustomCmd(this.value)" style="width: 100%; font-size: 12px;">
+            <option value="pelican-app">Pelican Panel — Docker Compose laravel-YYYY-MM-DD.log</option>
+            <option value="pelican-caddy">Pelican Panel — Caddy web reverse proxy logs</option>
+            <option value="cyberpanel-ols">CyberPanel — OpenLiteSpeed access.log (/usr/local/lsws/logs/access.log)</option>
+            <option value="cyberpanel-sites">CyberPanel — All hosted website domains (/home/*/logs/*.access_log)</option>
+            <option value="cyberpanel-waf">CyberPanel — OpenLiteSpeed error &amp; ModSecurity WAF log</option>
+            <option value="linux-auth">Linux Host — SSH authentication failures (/var/log/auth.log)</option>
+            <option value="custom">Custom remote shell tail command...</option>
+          </select>
+        </div>
+
+        <div id="custom-cmd-box" style="display: none; margin-bottom: 10px;">
+          <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">
+            Custom remote command
+          </label>
+          <input type="text" name="custom_cmd" placeholder="e.g. tail -F /var/log/nginx/access.log" style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+        </div>
+
+        <!-- Optional SSH Key Accordion -->
+        <details style="margin-bottom: 14px;">
+          <summary style="font-size: 11px; color: var(--accent); cursor: pointer; user-select: none;">
+            Or use Private Key instead of password
+          </summary>
+          <div style="margin-top: 6px;">
+            <textarea name="key_content" rows="3" placeholder="Paste OpenSSH or RSA private key (-----BEGIN OPENSSH PRIVATE KEY-----)..." style="width: 100%; font-family: var(--font-mono); font-size: 11px; resize: vertical;"></textarea>
+          </div>
+        </details>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;">
+          Connect &amp; stream VPS logs
+        </button>
+      </form>
+    </div>
+
+    <!-- Watch Local File Section -->
+    <div id="local-watch-section" style="display: none;">
+      <form action="/live/start" method="post">
+        <div style="margin-bottom: 14px;">
+          <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">
+            File path
+          </label>
+          <input type="text" name="log_path"
+                 placeholder="/var/log/auth.log or /var/www/pterodactyl/storage/logs/laravel.log"
+                 style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+          <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; align-items: center;">
+            <span style="font-size: 11px; color: var(--text-muted);">Presets:</span>
+            <a href="#" onclick="document.querySelector('input[name=log_path]').value='/var/log/auth.log'; return false;" style="font-size: 11px; color: var(--accent); text-decoration: none;">auth.log</a>
+            <span style="color: var(--border-strong);">&bull;</span>
+            <a href="#" onclick="document.querySelector('input[name=log_path]').value='/var/log/nginx/access.log'; return false;" style="font-size: 11px; color: var(--accent); text-decoration: none;">nginx access.log</a>
+            <span style="color: var(--border-strong);">&bull;</span>
+            <a href="#" onclick="document.querySelector('input[name=log_path]').value='/var/www/pterodactyl/storage/logs/laravel.log'; return false;" style="font-size: 11px; color: var(--accent); text-decoration: none;">Pterodactyl laravel.log</a>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+          <div>
+            <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">
+              Poll interval (seconds)
+            </label>
+            <input type="number" name="interval" value="2.0" step="0.5" min="0.5" max="60.0"
+                   style="width: 100%; font-variant-numeric: tabular-nums;">
+          </div>
+          <div style="display: flex; align-items: flex-end; padding-bottom: 8px;">
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); cursor: pointer;">
+              <input type="checkbox" name="from_start" value="true" style="accent-color: var(--accent);">
+              <span>Scan from start</span>
+            </label>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;">
+          Start local watch
+        </button>
+      </form>
+    </div>
   </div>
 
   <!-- Active Watchers List -->
@@ -79,13 +165,16 @@
     </div>
 
     {% if sessions %}
-      <div style="display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto;">
+      <div style="display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto;">
         {% for s in sessions %}
           <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
             <div style="min-width: 0;">
               <div style="display: flex; align-items: center; gap: 6px;">
                 <span class="live-dot" style="background: {% if s.status == 'ACTIVE' %}#10b981{% elif s.status == 'STOPPED' %}#64748b{% else %}#ef4444{% endif %};"></span>
                 <span style="font-weight: 500; font-size: 13px; font-family: var(--font-mono);">{{ s.file_name }}</span>
+                {% if 'ssh:' in s.file_name or s.log_path.startswith('ssh://') %}
+                  <span class="badge badge-high" style="font-size: 10px;">SSH STREAM</span>
+                {% endif %}
                 <span class="badge badge-info" style="font-size: 10px;">{{ s.status|lower }}</span>
               </div>
               <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
@@ -110,7 +199,7 @@
     {% else %}
       <div style="text-align: center; padding: 36px 16px; color: var(--text-muted); background: var(--bg-card); border-radius: 6px; border: 1px dashed var(--border);">
         <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 4px;">No active background watchers</p>
-        <p style="font-size: 12px;">Enter a file path on the left to start continuous tailing</p>
+        <p style="font-size: 12px;">Enter VPS details on the left or choose a local file to stream</p>
       </div>
     {% endif %}
   </div>
@@ -152,10 +241,10 @@
   <!-- Localhost SSH Pull Callout -->
   <div style="background: var(--bg-card); border-left: 3px solid var(--accent); padding: 12px 14px; border-radius: 4px; margin-bottom: 16px; font-size: 12px; color: var(--text-secondary); border: 1px solid var(--border); border-left: 3px solid var(--accent);">
     <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
-      Hosting LogLens locally on your PC (localhost:8080)?
+      Manual CLI alternative (optional)
     </div>
     <div>
-      No port forwarding, static IP, or public tunnel required. Pull directly from your local terminal using SSH stdout pipe:
+      Prefer running commands from your terminal instead of the built-in <strong>Remote VPS (SSH stream)</strong> form above? You can pipe live streams directly into LogLens over HTTP:
     </div>
     <div style="margin-top: 6px; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
       <pre style="margin: 0; flex: 1; padding: 6px 10px; font-size: 11px;">ssh root@&lt;YOUR_VPS&gt; "&lt;remote_tail_cmd&gt;" | curl -s -X POST http://localhost:8080/api/ingest/stream -H "X-Log-Source: &lt;source&gt;" -T -</pre>
@@ -295,4 +384,27 @@
     </div>
   </div>
 </div>
+
+<script>
+function switchWatchMode(mode) {
+  const sshSection = document.getElementById('ssh-watch-section');
+  const localSection = document.getElementById('local-watch-section');
+  if (sshSection && localSection) {
+    if (mode === 'ssh') {
+      sshSection.style.display = 'block';
+      localSection.style.display = 'none';
+    } else {
+      sshSection.style.display = 'none';
+      localSection.style.display = 'block';
+    }
+  }
+}
+
+function toggleCustomCmd(val) {
+  const customBox = document.getElementById('custom-cmd-box');
+  if (customBox) {
+    customBox.style.display = (val === 'custom') ? 'block' : 'none';
+  }
+}
+</script>
 {% endblock %}

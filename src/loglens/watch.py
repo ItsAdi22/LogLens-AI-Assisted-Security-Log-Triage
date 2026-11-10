@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import collections
+import contextlib
 import logging
 import os
 import signal
@@ -185,6 +186,127 @@ class WatchMonitor:
         self.console.print("[dim]LogLens watch monitor stopped cleanly.[/dim]")
 
 
+class LiveSSHMonitor(WatchMonitor):
+    """Watches a remote VPS log stream over SSH in real time."""
+
+    def __init__(
+        self,
+        host: str,
+        port: int = 22,
+        username: str = "root",
+        password: str | None = None,
+        key_path: str | None = None,
+        remote_cmd: str = "tail -F /var/log/auth.log",
+        source_label: str = "remote-ssh.log",
+        parser: Parser | None = None,
+        notifier: Notifier | None = None,
+        storage: StorageManager | None = None,
+        interval: float = 2.0,
+        console: Console | None = None,
+    ) -> None:
+        super().__init__(
+            log_path=Path(source_label),
+            parser=parser,
+            notifier=notifier,
+            storage=storage,
+            interval=interval,
+            from_start=False,
+            console=console,
+        )
+        self.host = host
+        self.port = port
+        self.username = username
+        self.password = password
+        self.key_path = key_path
+        self.remote_cmd = remote_cmd
+        self.source_label = source_label
+        self._ssh_client: Any = None
+
+    def stop(self) -> None:
+        """Signal the watch loop to terminate and close the SSH client."""
+        self._running = False
+        if self._ssh_client is not None:
+            with contextlib.suppress(Exception):
+                self._ssh_client.close()
+
+    def run(
+        self,
+        max_iterations: int | None = None,
+        on_cycle_complete: Callable[[list[Finding]], None] | None = None,
+    ) -> None:
+        """Connect over SSH, stream remote command output, cluster, and evaluate rules."""
+        import paramiko
+
+        self._running = True
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        self._ssh_client = client
+
+        try:
+            client.connect(
+                hostname=self.host,
+                port=self.port,
+                username=self.username,
+                password=self.password or None,
+                key_filename=self.key_path or None,
+                timeout=12.0,
+                banner_timeout=12.0,
+            )
+            stdin, stdout, _stderr = client.exec_command(self.remote_cmd, get_pty=True)
+            stdin.close()
+
+            p = self.parser or registry.get("generic")
+            buffer: list[str] = []
+            last_flush = time.time()
+            iteration = 0
+
+            while self._running:
+                if stdout.channel.recv_ready():
+                    line = stdout.readline()
+                    if not line:
+                        break
+                    clean_line = line.strip()
+                    if clean_line:
+                        buffer.append(clean_line)
+                else:
+                    time.sleep(0.1)
+
+                now = time.time()
+                if (now - last_flush >= self.interval and buffer) or len(buffer) >= 50:
+                    lines_to_process = list(buffer)
+                    buffer.clear()
+                    last_flush = now
+
+                    events: list[Event] = []
+                    for idx, raw_line in enumerate(lines_to_process, start=1):
+                        if p:
+                            ev = p.parse_line(raw_line, idx)
+                            if ev:
+                                events.append(ev)
+                                self.clusterer.add_event(ev)
+
+                    if events:
+                        self._process_cycle(events, len(lines_to_process), on_cycle_complete)
+
+                    iteration += 1
+                    if max_iterations is not None and iteration >= max_iterations:
+                        break
+
+            if buffer and p:
+                events = []
+                for idx, raw_line in enumerate(buffer, start=1):
+                    ev = p.parse_line(raw_line, idx)
+                    if ev:
+                        events.append(ev)
+                        self.clusterer.add_event(ev)
+                if events:
+                    self._process_cycle(events, len(buffer), on_cycle_complete)
+
+        finally:
+            with contextlib.suppress(Exception):
+                client.close()
+
+
 class LiveWatchSession:
     """State and handles for an active or stopped live file tail monitor."""
 
@@ -278,6 +400,81 @@ class LiveWatchManager:
                 event_count=0,
                 findings_count=0,
                 message=f"Live watch started on {path}",
+                severity="info",
+            )
+
+        thread.start()
+        return session_id
+
+    def start_ssh_watch(
+        self,
+        host: str,
+        port: int = 22,
+        username: str = "root",
+        password: str | None = None,
+        key_path: str | None = None,
+        remote_cmd: str = "tail -F /var/log/auth.log",
+        source_label: str = "remote-ssh.log",
+        interval: float = 2.0,
+        notifier: Notifier | None = None,
+    ) -> str:
+        """Start a new background live watch monitor over SSH for a remote VPS."""
+        session_id = f"watch-ssh-{uuid.uuid4().hex[:6]}"
+
+        def on_cycle(findings: list[Finding]) -> None:
+            with self._lock:
+                sess = self._sessions.get(session_id)
+                if sess:
+                    sess.last_activity = datetime.now(UTC)
+                    sess.total_findings += len(findings)
+                if findings:
+                    top_sev = max(
+                        (f.rule_severity.lower() for f in findings),
+                        key=lambda s: SEVERITY_LEVELS.get(s, 1),
+                        default="info",
+                    )
+                    self.record_activity(
+                        source=source_label,
+                        event_count=len(findings),
+                        findings_count=len(findings),
+                        message=f"Detected {len(findings)} security finding(s) on {source_label}",
+                        severity=top_sev,
+                    )
+
+        monitor = LiveSSHMonitor(
+            host=host,
+            port=port,
+            username=username,
+            password=password,
+            key_path=key_path,
+            remote_cmd=remote_cmd,
+            source_label=source_label,
+            notifier=notifier,
+            storage=self.storage,
+            interval=interval,
+        )
+
+        def runner() -> None:
+            try:
+                monitor.run(on_cycle_complete=on_cycle)
+            except Exception as e:
+                logger.error("Error in live SSH watch session %s: %s", session_id, e)
+                with self._lock:
+                    sess = self._sessions.get(session_id)
+                    if sess:
+                        sess.status = "ERROR"
+                        sess.error = str(e)
+
+        thread = threading.Thread(target=runner, daemon=True, name=f"loglens-{session_id}")
+        session = LiveWatchSession(session_id, Path(source_label), monitor, thread)
+
+        with self._lock:
+            self._sessions[session_id] = session
+            self.record_activity(
+                source=source_label,
+                event_count=0,
+                findings_count=0,
+                message=f"Live SSH stream connected to {username}@{host}",
                 severity="info",
             )
 

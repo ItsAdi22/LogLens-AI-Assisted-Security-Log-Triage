@@ -509,7 +509,7 @@ def create_app(
     @app.post("/live/start", dependencies=[Depends(verify_token)])
     def live_start(
         request: Request,
-        log_path: str = Form(...),
+        log_path: str = Form(""),
         interval: float = Form(2.0),
         from_start: bool = Form(False),
     ) -> Response:
@@ -521,6 +521,69 @@ def create_app(
             live_manager.start_watch(clean_path, interval=interval, from_start=from_start)
         except FileNotFoundError as fnf:
             raise HTTPException(status_code=404, detail=str(fnf)) from fnf
+
+        if request.headers.get("HX-Request"):
+            return Response(headers={"HX-Redirect": "/live"})
+        return RedirectResponse(url="/live", status_code=status.HTTP_303_SEE_OTHER)
+
+    @app.post("/live/ssh/start", dependencies=[Depends(verify_token)])
+    def live_ssh_start(
+        request: Request,
+        host: str = Form(""),
+        port: int = Form(22),
+        username: str = Form("root"),
+        password: str = Form(""),
+        key_content: str = Form(""),
+        preset: str = Form("pelican-app"),
+        custom_cmd: str = Form(""),
+        interval: float = Form(2.0),
+    ) -> Response:
+        """Start a new background live watch monitor over SSH directly from the browser."""
+        clean_host = host.strip()
+        clean_user = username.strip() or "root"
+        if not clean_host:
+            raise HTTPException(status_code=400, detail="VPS IP or hostname is required.")
+
+        cmd_map = {
+            "pelican-app": "cd ~/pelican-panel && docker compose exec -T app tail -F storage/logs/laravel-$(date +%Y-%m-%d).log",
+            "pelican-caddy": "cd ~/pelican-panel && docker compose logs -f --tail=50 caddy",
+            "cyberpanel-ols": "tail -F /usr/local/lsws/logs/access.log",
+            "cyberpanel-sites": "tail -F /home/*/logs/*.access_log",
+            "cyberpanel-waf": "tail -F /usr/local/lsws/logs/error.log",
+            "linux-auth": "tail -F /var/log/auth.log",
+            "custom": custom_cmd.strip(),
+        }
+        chosen_cmd = cmd_map.get(preset, custom_cmd.strip() or "tail -F /var/log/auth.log")
+        source_label = f"ssh://{clean_user}@{clean_host} ({preset})"
+
+        key_path = None
+        if key_content.strip():
+            import tempfile
+
+            with tempfile.NamedTemporaryFile(mode="w", delete=False) as tmp_key:
+                tmp_key.write(key_content.strip())
+                key_path = tmp_key.name
+
+        settings = storage.get_all_settings()
+        notifier = None
+        if settings.get("auto_notify_enabled") == "true":
+            target_ch = "telegram" if settings.get("auto_notify_telegram") == "true" else "discord"
+            notifier = resolve_notifier(target_ch, settings)
+
+        try:
+            live_manager.start_ssh_watch(
+                host=clean_host,
+                port=port,
+                username=clean_user,
+                password=password.strip() or None,
+                key_path=key_path,
+                remote_cmd=chosen_cmd,
+                source_label=source_label,
+                interval=max(0.5, min(interval, 60.0)),
+                notifier=notifier,
+            )
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to start SSH watch: {e}") from e
 
         if request.headers.get("HX-Request"):
             return Response(headers={"HX-Redirect": "/live"})

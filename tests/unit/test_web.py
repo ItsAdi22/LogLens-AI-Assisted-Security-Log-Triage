@@ -723,3 +723,46 @@ def test_settings_auto_notify_anti_spam(tmp_path: Path) -> None:
     assert storage.get_setting("auto_notify_telegram") == "true"
     assert storage.get_setting("auto_notify_discord") == "true"
     storage.close()
+
+
+def test_live_ssh_start_endpoint(tmp_path: Path) -> None:
+    from unittest.mock import MagicMock, patch
+
+    db_file = tmp_path / "test.db"
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    # 1. Missing host fails with 400
+    res_bad = client.post("/live/ssh/start", data={"host": "", "username": "root"})
+    assert res_bad.status_code == 400
+
+    # 2. Mock paramiko client to simulate remote stream
+    mock_client = MagicMock()
+    mock_transport = MagicMock()
+    mock_session = MagicMock()
+    mock_stdout = MagicMock()
+    mock_stdout.readline.return_value = ""  # Clean EOF
+    mock_session.makefile.return_value = mock_stdout
+    mock_transport.open_session.return_value = mock_session
+    mock_client.get_transport.return_value = mock_transport
+
+    with patch("paramiko.SSHClient", return_value=mock_client):
+        res = client.post(
+            "/live/ssh/start",
+            data={
+                "host": "222.167.207.101",
+                "port": 22,
+                "username": "root",
+                "password": "secretpassword",
+                "preset": "pelican-app",
+            },
+            follow_redirects=False,
+        )
+        assert res.status_code == 303
+        assert res.headers["location"] == "/live"
+
+    # Verify live page reflects watcher session
+    res_live = client.get("/live")
+    assert res_live.status_code == 200
+    assert "222.167.207.101" in res_live.text
+
