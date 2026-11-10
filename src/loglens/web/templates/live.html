@@ -79,7 +79,8 @@
             Target log source preset
           </label>
           <select name="preset" id="ssh-preset-select" onchange="toggleCustomCmd(this.value)" style="width: 100%; font-size: 12px;">
-            <option value="pelican-app">Pelican Panel — Docker Compose laravel-YYYY-MM-DD.log</option>
+            <option value="pelican-compose">Pelican Panel — Live Docker Compose logs (recommended)</option>
+            <option value="pelican-app">Pelican Panel — Laravel error log (storage/logs/laravel-*.log)</option>
             <option value="pelican-caddy">Pelican Panel — Caddy web reverse proxy logs</option>
             <option value="cyberpanel-ols">CyberPanel — OpenLiteSpeed access.log (/usr/local/lsws/logs/access.log)</option>
             <option value="cyberpanel-sites">CyberPanel — All hosted website domains (/home/*/logs/*.access_log)</option>
@@ -93,7 +94,7 @@
           <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">
             Custom remote command
           </label>
-          <input type="text" name="custom_cmd" placeholder="e.g. tail -F /var/log/nginx/access.log" style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+          <input type="text" name="custom_cmd" placeholder="e.g. tail -n 50 -F /var/log/nginx/access.log" style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
         </div>
 
         <!-- Optional SSH Key Accordion -->
@@ -106,9 +107,18 @@
           </div>
         </details>
 
-        <button type="submit" class="btn btn-primary" style="width: 100%;">
-          Connect &amp; stream VPS logs
-        </button>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button type="submit" class="btn btn-primary" style="flex: 1; min-width: 180px;">
+            Connect &amp; stream VPS logs
+          </button>
+          <button type="button" class="btn btn-secondary" style="font-size: 12px; padding: 0 14px;"
+                  hx-post="/api/live/ssh/test"
+                  hx-include="#ssh-watch-section form"
+                  hx-target="#ssh-test-result">
+            Test &amp; diagnose
+          </button>
+        </div>
+        <div id="ssh-test-result" style="margin-top: 10px;"></div>
       </form>
     </div>
 
@@ -165,34 +175,46 @@
     </div>
 
     {% if sessions %}
-      <div style="display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto;">
+      <div style="display: flex; flex-direction: column; gap: 10px; max-height: 340px; overflow-y: auto;">
         {% for s in sessions %}
-          <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
-            <div style="min-width: 0;">
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <span class="live-dot" style="background: {% if s.status == 'ACTIVE' %}#10b981{% elif s.status == 'STOPPED' %}#64748b{% else %}#ef4444{% endif %};"></span>
-                <span style="font-weight: 500; font-size: 13px; font-family: var(--font-mono);">{{ s.file_name }}</span>
-                {% if 'ssh:' in s.file_name or s.log_path.startswith('ssh://') %}
-                  <span class="badge badge-high" style="font-size: 10px;">SSH STREAM</span>
+          <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+              <div style="min-width: 0;">
+                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                  <span class="live-dot" style="background: {% if s.status == 'ACTIVE' %}#10b981{% elif s.status == 'STOPPED' %}#64748b{% else %}#ef4444{% endif %};"></span>
+                  <span style="font-weight: 500; font-size: 13px; font-family: var(--font-mono); word-break: break-all;">{{ s.file_name }}</span>
+                  {% if s.is_ssh or 'ssh:' in s.file_name or 'ssh://' in s.log_path %}
+                    <span class="badge badge-high" style="font-size: 10px;">SSH STREAM</span>
+                  {% endif %}
+                  <span class="badge {% if s.status == 'ACTIVE' %}badge-low{% elif s.status == 'ERROR' %}badge-critical{% else %}badge-info{% endif %}" style="font-size: 10px;">
+                    {{ s.status|lower }}
+                  </span>
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                  {{ s.log_path }} &bull;
+                  <span style="color: var(--accent); font-weight: 500; font-variant-numeric: tabular-nums;">{{ s.total_lines or 0 }} lines</span> &bull;
+                  <span style="font-variant-numeric: tabular-nums;">{{ s.total_findings or 0 }} findings</span>
+                </div>
+              </div>
+              <div>
+                {% if s.status == 'ACTIVE' %}
+                  <form action="/live/stop" method="post" style="margin: 0;">
+                    <input type="hidden" name="session_id" value="{{ s.session_id }}">
+                    <button type="submit" class="btn btn-danger btn-sm">
+                      Stop
+                    </button>
+                  </form>
+                {% else %}
+                  <span style="font-size: 11px; color: var(--text-muted);">Stopped</span>
                 {% endif %}
-                <span class="badge badge-info" style="font-size: 10px;">{{ s.status|lower }}</span>
-              </div>
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                {{ s.log_path }} &bull; <span style="font-variant-numeric: tabular-nums;">{{ s.total_findings }} findings</span>
               </div>
             </div>
-            <div>
-              {% if s.status == 'ACTIVE' %}
-                <form action="/live/stop" method="post" style="margin: 0;">
-                  <input type="hidden" name="session_id" value="{{ s.session_id }}">
-                  <button type="submit" class="btn btn-danger btn-sm">
-                    Stop
-                  </button>
-                </form>
-              {% else %}
-                <span style="font-size: 11px; color: var(--text-muted);">Stopped</span>
-              {% endif %}
-            </div>
+
+            {% if s.error %}
+              <div style="margin-top: 4px; padding: 6px 10px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 4px; color: #f87171; font-size: 11px; font-family: var(--font-mono); word-break: break-word;">
+                <strong>Error:</strong> {{ s.error }}
+              </div>
+            {% endif %}
           </div>
         {% endfor %}
       </div>

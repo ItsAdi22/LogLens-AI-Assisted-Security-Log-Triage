@@ -38,7 +38,7 @@ from loglens.parsers import registry
 from loglens.redact import Redactor
 from loglens.rules import RuleEngine, get_builtin_rules
 from loglens.store import DEFAULT_DB_PATH, StorageManager
-from loglens.watch import LiveWatchManager
+from loglens.watch import LiveWatchManager, test_ssh_connection
 
 MODULE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = MODULE_DIR / "static"
@@ -545,15 +545,16 @@ def create_app(
             raise HTTPException(status_code=400, detail="VPS IP or hostname is required.")
 
         cmd_map = {
-            "pelican-app": "cd ~/pelican-panel && docker compose exec -T app tail -F storage/logs/laravel-$(date +%Y-%m-%d).log",
-            "pelican-caddy": "cd ~/pelican-panel && docker compose logs -f --tail=50 caddy",
-            "cyberpanel-ols": "tail -F /usr/local/lsws/logs/access.log",
-            "cyberpanel-sites": "tail -F /home/*/logs/*.access_log",
-            "cyberpanel-waf": "tail -F /usr/local/lsws/logs/error.log",
-            "linux-auth": "tail -F /var/log/auth.log",
+            "pelican-compose": "cd ~/pelican-panel 2>/dev/null || cd /root/pelican-panel 2>/dev/null || true; docker compose logs -f --tail=50",
+            "pelican-app": "cd ~/pelican-panel 2>/dev/null || cd /root/pelican-panel 2>/dev/null || true; docker compose logs -f --tail=50 2>/dev/null || docker compose exec -T panel tail -n 50 -F storage/logs/laravel-$(date +%Y-%m-%d).log 2>/dev/null || docker compose exec -T app tail -n 50 -F storage/logs/laravel-$(date +%Y-%m-%d).log",
+            "pelican-caddy": "cd ~/pelican-panel 2>/dev/null || cd /root/pelican-panel 2>/dev/null || true; docker compose logs -f --tail=50 caddy",
+            "cyberpanel-ols": "tail -n 50 -F /usr/local/lsws/logs/access.log",
+            "cyberpanel-sites": "tail -n 50 -F /home/*/logs/*.access_log",
+            "cyberpanel-waf": "tail -n 50 -F /usr/local/lsws/logs/error.log",
+            "linux-auth": "tail -n 50 -F /var/log/auth.log 2>/dev/null || tail -n 50 -F /var/log/secure",
             "custom": custom_cmd.strip(),
         }
-        chosen_cmd = cmd_map.get(preset, custom_cmd.strip() or "tail -F /var/log/auth.log")
+        chosen_cmd = cmd_map.get(preset, custom_cmd.strip() or "tail -n 50 -F /var/log/auth.log")
         source_label = f"ssh://{clean_user}@{clean_host} ({preset})"
 
         key_path = None
@@ -588,6 +589,52 @@ def create_app(
         if request.headers.get("HX-Request"):
             return Response(headers={"HX-Redirect": "/live"})
         return RedirectResponse(url="/live", status_code=status.HTTP_303_SEE_OTHER)
+
+    @app.post("/api/live/ssh/test", response_class=HTMLResponse, dependencies=[Depends(verify_token)])
+    def live_ssh_test(
+        host: str = Form(""),
+        port: int = Form(22),
+        username: str = Form("root"),
+        password: str = Form(""),
+        key_content: str = Form(""),
+    ) -> HTMLResponse:
+        """Test SSH connectivity and return HTMX diagnosis snippet."""
+        clean_host = host.strip()
+        clean_user = username.strip() or "root"
+        if not clean_host:
+            return HTMLResponse(
+                '<div style="padding: 8px 12px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); border-radius: 4px; color: #f87171; font-size: 11px;">'
+                "⚠️ Host IP is required to test connection."
+                "</div>"
+            )
+
+        key_path = None
+        if key_content.strip():
+            import tempfile
+
+            with tempfile.NamedTemporaryFile(mode="w", delete=False) as tmp_key:
+                tmp_key.write(key_content.strip())
+                key_path = tmp_key.name
+
+        diag = test_ssh_connection(
+            host=clean_host,
+            port=port,
+            username=clean_user,
+            password=password.strip() or None,
+            key_path=key_path,
+        )
+
+        if diag["success"]:
+            return HTMLResponse(
+                f'<div style="padding: 8px 12px; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); border-radius: 4px; color: #34d399; font-size: 11px; font-family: var(--font-mono);">'
+                f'✓ {html.escape(diag["message"])}'
+                "</div>"
+            )
+        return HTMLResponse(
+            f'<div style="padding: 8px 12px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); border-radius: 4px; color: #f87171; font-size: 11px; font-family: var(--font-mono);">'
+            f'✗ {html.escape(diag["message"])}'
+            "</div>"
+        )
 
     @app.post("/live/stop", dependencies=[Depends(verify_token)])
     def live_stop(request: Request, session_id: str = Form(...)) -> Response:

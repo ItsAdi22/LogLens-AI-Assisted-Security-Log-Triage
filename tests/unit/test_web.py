@@ -738,13 +738,13 @@ def test_live_ssh_start_endpoint(tmp_path: Path) -> None:
 
     # 2. Mock paramiko client to simulate remote stream
     mock_client = MagicMock()
-    mock_transport = MagicMock()
-    mock_session = MagicMock()
+    mock_channel = MagicMock()
+    mock_channel.recv.return_value = b""  # Clean EOF
+    mock_channel.exit_status_ready.return_value = True
+    mock_channel.recv_exit_status.return_value = 0
     mock_stdout = MagicMock()
-    mock_stdout.readline.return_value = ""  # Clean EOF
-    mock_session.makefile.return_value = mock_stdout
-    mock_transport.open_session.return_value = mock_session
-    mock_client.get_transport.return_value = mock_transport
+    mock_stdout.channel = mock_channel
+    mock_client.exec_command.return_value = (MagicMock(), mock_stdout, MagicMock())
 
     with patch("paramiko.SSHClient", return_value=mock_client):
         res = client.post(
@@ -765,4 +765,41 @@ def test_live_ssh_start_endpoint(tmp_path: Path) -> None:
     res_live = client.get("/live")
     assert res_live.status_code == 200
     assert "222.167.207.101" in res_live.text
+
+
+def test_live_ssh_test_endpoint(tmp_path: Path) -> None:
+    from unittest.mock import MagicMock, patch
+
+    db_file = tmp_path / "test.db"
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    # 1. Missing host returns warning snippet
+    res_bad = client.post("/api/live/ssh/test", data={"host": "", "username": "root"})
+    assert res_bad.status_code == 200
+    assert "Host IP is required" in res_bad.text
+
+    # 2. Mock paramiko client for successful diagnosis
+    mock_client = MagicMock()
+    mock_stdout = MagicMock()
+    mock_stdout.read.return_value = (
+        b"---OS---\nLinux mpanel 5.15\n---DOCKER---\n/usr/bin/docker\n"
+        b"---PELICAN---\n/root/pelican-panel\n---OLS---\n/usr/local/lsws\n"
+    )
+    mock_client.exec_command.return_value = (MagicMock(), mock_stdout, MagicMock())
+
+    with patch("paramiko.SSHClient", return_value=mock_client):
+        res = client.post(
+            "/api/live/ssh/test",
+            data={
+                "host": "222.167.207.101",
+                "port": 22,
+                "username": "root",
+                "password": "secretpassword",
+            },
+        )
+        assert res.status_code == 200
+        assert "Connected to root@222.167.207.101" in res.text
+        assert "Pelican directory" in res.text
+
 

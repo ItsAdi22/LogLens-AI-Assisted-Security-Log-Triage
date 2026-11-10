@@ -60,7 +60,7 @@ class WatchMonitor:
         self,
         events: list[Event],
         lines_count: int,
-        on_cycle_complete: Callable[[list[Finding]], None] | None = None,
+        on_cycle_complete: Callable[..., None] | None = None,
     ) -> list[Finding]:
         """Evaluate rules on accumulated events and dispatch alerts."""
         clusters = self.clusterer.get_clusters()
@@ -93,14 +93,17 @@ class WatchMonitor:
             self.storage.save_run(report)
 
         if on_cycle_complete:
-            on_cycle_complete(findings)
+            try:
+                on_cycle_complete(findings, lines_count, len(events))
+            except TypeError:
+                on_cycle_complete(findings)
 
         return findings
 
     def run(
         self,
         max_iterations: int | None = None,
-        on_cycle_complete: Callable[[list[Finding]], None] | None = None,
+        on_cycle_complete: Callable[..., None] | None = None,
     ) -> None:
         """Run the tail monitoring loop."""
         self._running = True
@@ -232,7 +235,7 @@ class LiveSSHMonitor(WatchMonitor):
     def run(
         self,
         max_iterations: int | None = None,
-        on_cycle_complete: Callable[[list[Finding]], None] | None = None,
+        on_cycle_complete: Callable[..., None] | None = None,
     ) -> None:
         """Connect over SSH, stream remote command output, cluster, and evaluate rules."""
         import paramiko
@@ -243,33 +246,62 @@ class LiveSSHMonitor(WatchMonitor):
         self._ssh_client = client
 
         try:
-            client.connect(
-                hostname=self.host,
-                port=self.port,
-                username=self.username,
-                password=self.password or None,
-                key_filename=self.key_path or None,
-                timeout=12.0,
-                banner_timeout=12.0,
-            )
+            try:
+                client.connect(
+                    hostname=self.host,
+                    port=self.port,
+                    username=self.username,
+                    password=self.password or None,
+                    key_filename=self.key_path or None,
+                    timeout=12.0,
+                    banner_timeout=12.0,
+                    look_for_keys=False,
+                    allow_agent=False,
+                )
+            except paramiko.AuthenticationException as auth_err:
+                raise RuntimeError(
+                    f"Authentication failed for {self.username}@{self.host}: invalid password or key"
+                ) from auth_err
+            except TimeoutError as to_err:
+                raise RuntimeError(
+                    f"Connection timed out reaching {self.host}:{self.port} (check host IP and firewall)"
+                ) from to_err
+            except Exception as conn_err:
+                raise RuntimeError(
+                    f"Failed to connect to {self.username}@{self.host}:{self.port}: {conn_err}"
+                ) from conn_err
+
             stdin, stdout, _stderr = client.exec_command(self.remote_cmd, get_pty=True)
             stdin.close()
+            channel = stdout.channel
+            channel.settimeout(0.2)
 
-            p = self.parser or registry.get("generic")
             buffer: list[str] = []
+            recent_output: list[str] = []
             last_flush = time.time()
             iteration = 0
+            raw_buf = ""
 
             while self._running:
-                if stdout.channel.recv_ready():
-                    line = stdout.readline()
-                    if not line:
+                try:
+                    data = channel.recv(4096)
+                    if not data:
+                        # Channel closed by remote end
                         break
-                    clean_line = line.strip()
-                    if clean_line:
-                        buffer.append(clean_line)
-                else:
-                    time.sleep(0.1)
+                    raw_text = data.decode("utf-8", errors="replace")
+                    raw_buf += raw_text
+                    while "\n" in raw_buf:
+                        line, raw_buf = raw_buf.split("\n", 1)
+                        clean_line = line.strip("\r\n")
+                        if clean_line:
+                            buffer.append(clean_line)
+                            recent_output.append(clean_line)
+                            if len(recent_output) > 25:
+                                recent_output.pop(0)
+                except TimeoutError:
+                    pass
+                except Exception:
+                    break
 
                 now = time.time()
                 if (now - last_flush >= self.interval and buffer) or len(buffer) >= 50:
@@ -277,30 +309,44 @@ class LiveSSHMonitor(WatchMonitor):
                     buffer.clear()
                     last_flush = now
 
-                    events: list[Event] = []
-                    for idx, raw_line in enumerate(lines_to_process, start=1):
-                        if p:
-                            ev = p.parse_line(raw_line, idx)
+                    if not self.parser:
+                        self.parser = registry.autodetect(lines_to_process[:20]) or registry.get("generic")
+                    p_active = self.parser or registry.get("generic")
+
+                    if p_active is not None:
+                        events: list[Event] = []
+                        for idx, raw_line in enumerate(lines_to_process, start=1):
+                            ev = p_active.parse_line(raw_line, idx)
                             if ev:
                                 events.append(ev)
                                 self.clusterer.add_event(ev)
 
-                    if events:
                         self._process_cycle(events, len(lines_to_process), on_cycle_complete)
 
                     iteration += 1
                     if max_iterations is not None and iteration >= max_iterations:
                         break
 
-            if buffer and p:
-                events = []
-                for idx, raw_line in enumerate(buffer, start=1):
-                    ev = p.parse_line(raw_line, idx)
-                    if ev:
-                        events.append(ev)
-                        self.clusterer.add_event(ev)
-                if events:
+            # Flush any remaining buffer on termination
+            if raw_buf.strip():
+                buffer.append(raw_buf.strip())
+            if buffer:
+                p_flush = self.parser or registry.get("generic")
+                if p_flush is not None:
+                    events = []
+                    for idx, raw_line in enumerate(buffer, start=1):
+                        ev = p_flush.parse_line(raw_line, idx)
+                        if ev:
+                            events.append(ev)
+                            self.clusterer.add_event(ev)
                     self._process_cycle(events, len(buffer), on_cycle_complete)
+
+            # Check if remote process exited with error
+            if channel.exit_status_ready():
+                exit_code = channel.recv_exit_status()
+                if exit_code != 0:
+                    err_msg = " ".join(recent_output[-3:]).strip() or f"Process exited with code {exit_code}"
+                    raise RuntimeError(f"Remote command failed (exit code {exit_code}): {err_msg[:200]}")
 
         finally:
             with contextlib.suppress(Exception):
@@ -313,18 +359,25 @@ class LiveWatchSession:
     def __init__(
         self,
         session_id: str,
-        log_path: Path,
+        log_path: Path | str,
         monitor: WatchMonitor,
         thread: threading.Thread,
+        *,
+        is_ssh: bool = False,
+        source_label: str | None = None,
     ) -> None:
         self.session_id = session_id
-        self.log_path = log_path
+        self.log_path = Path(log_path) if isinstance(log_path, str) else log_path
+        self.source_label = source_label or str(log_path).replace("\\", "/")
         self.monitor = monitor
         self.thread = thread
         self.started_at = datetime.now(UTC)
         self.total_findings = 0
+        self.total_lines = 0
+        self.total_events = 0
         self.last_activity = datetime.now(UTC)
         self.status = "ACTIVE"
+        self.is_ssh = is_ssh
         self.error: str | None = None
 
 
@@ -351,12 +404,14 @@ class LiveWatchManager:
 
         session_id = f"watch-{uuid.uuid4().hex[:8]}"
 
-        def on_cycle(findings: list[Finding]) -> None:
+        def on_cycle(findings: list[Finding], lines_count: int = 0, events_count: int = 0) -> None:
             with self._lock:
                 sess = self._sessions.get(session_id)
                 if sess:
                     sess.last_activity = datetime.now(UTC)
                     sess.total_findings += len(findings)
+                    sess.total_lines += lines_count
+                    sess.total_events += events_count
                 if findings:
                     top_sev = max(
                         (f.rule_severity.lower() for f in findings),
@@ -389,9 +444,16 @@ class LiveWatchManager:
                     if sess:
                         sess.status = "ERROR"
                         sess.error = str(e)
+                    self.record_activity(
+                        source=path.name,
+                        event_count=0,
+                        findings_count=0,
+                        message=f"Watch monitor error on {path.name}: {e}",
+                        severity="high",
+                    )
 
         thread = threading.Thread(target=runner, daemon=True, name=f"loglens-{session_id}")
-        session = LiveWatchSession(session_id, path, monitor, thread)
+        session = LiveWatchSession(session_id, path, monitor, thread, is_ssh=False)
 
         with self._lock:
             self._sessions[session_id] = session
@@ -413,20 +475,26 @@ class LiveWatchManager:
         username: str = "root",
         password: str | None = None,
         key_path: str | None = None,
-        remote_cmd: str = "tail -F /var/log/auth.log",
+        remote_cmd: str = "tail -n 50 -F /var/log/auth.log",
         source_label: str = "remote-ssh.log",
         interval: float = 2.0,
         notifier: Notifier | None = None,
     ) -> str:
         """Start a new background live watch monitor over SSH for a remote VPS."""
         session_id = f"watch-ssh-{uuid.uuid4().hex[:6]}"
+        last_logged_activity = 0.0
 
-        def on_cycle(findings: list[Finding]) -> None:
+        def on_cycle(findings: list[Finding], lines_count: int = 0, events_count: int = 0) -> None:
+            nonlocal last_logged_activity
             with self._lock:
                 sess = self._sessions.get(session_id)
                 if sess:
                     sess.last_activity = datetime.now(UTC)
                     sess.total_findings += len(findings)
+                    sess.total_lines += lines_count
+                    sess.total_events += events_count
+
+                now = time.time()
                 if findings:
                     top_sev = max(
                         (f.rule_severity.lower() for f in findings),
@@ -440,6 +508,18 @@ class LiveWatchManager:
                         message=f"Detected {len(findings)} security finding(s) on {source_label}",
                         severity=top_sev,
                     )
+                    last_logged_activity = now
+                elif lines_count > 0 and (
+                    now - last_logged_activity >= 8.0 or (sess and sess.total_lines <= lines_count)
+                ):
+                    self.record_activity(
+                        source=source_label,
+                        event_count=events_count,
+                        findings_count=0,
+                        message=f"Streamed {lines_count} log line(s) from {source_label} ({events_count} parsed events, 0 threats)",
+                        severity="info",
+                    )
+                    last_logged_activity = now
 
         monitor = LiveSSHMonitor(
             host=host,
@@ -464,9 +544,23 @@ class LiveWatchManager:
                     if sess:
                         sess.status = "ERROR"
                         sess.error = str(e)
+                    self.record_activity(
+                        source=source_label,
+                        event_count=0,
+                        findings_count=0,
+                        message=f"SSH stream failed on {source_label}: {e}",
+                        severity="high",
+                    )
 
         thread = threading.Thread(target=runner, daemon=True, name=f"loglens-{session_id}")
-        session = LiveWatchSession(session_id, Path(source_label), monitor, thread)
+        session = LiveWatchSession(
+            session_id=session_id,
+            log_path=Path(source_label),
+            monitor=monitor,
+            thread=thread,
+            is_ssh=True,
+            source_label=source_label,
+        )
 
         with self._lock:
             self._sessions[session_id] = session
@@ -474,7 +568,7 @@ class LiveWatchManager:
                 source=source_label,
                 event_count=0,
                 findings_count=0,
-                message=f"Live SSH stream connected to {username}@{host}",
+                message=f"Live SSH stream initiated to {username}@{host}",
                 severity="info",
             )
 
@@ -490,10 +584,10 @@ class LiveWatchManager:
             sess.monitor.stop()
             sess.status = "STOPPED"
             self.record_activity(
-                source=sess.log_path.name,
+                source=sess.source_label,
                 event_count=0,
                 findings_count=0,
-                message=f"Live watch stopped on {sess.log_path.name}",
+                message=f"Live watch stopped on {sess.source_label}",
                 severity="info",
             )
             return True
@@ -506,12 +600,15 @@ class LiveWatchManager:
                 result.append(
                     {
                         "session_id": s.session_id,
-                        "log_path": str(s.log_path),
-                        "file_name": s.log_path.name,
+                        "log_path": s.source_label,
+                        "file_name": s.source_label if s.is_ssh else s.log_path.name,
                         "status": s.status,
                         "started_at": s.started_at.strftime("%Y-%m-%d %H:%M:%S UTC"),
                         "total_findings": s.total_findings,
+                        "total_lines": s.total_lines,
+                        "total_events": s.total_events,
                         "last_activity": s.last_activity.strftime("%Y-%m-%d %H:%M:%S UTC"),
+                        "is_ssh": s.is_ssh,
                         "error": s.error,
                     }
                 )
@@ -543,3 +640,69 @@ class LiveWatchManager:
             for s in self._sessions.values():
                 s.monitor.stop()
                 s.status = "STOPPED"
+
+
+def test_ssh_connection(
+    host: str,
+    port: int = 22,
+    username: str = "root",
+    password: str | None = None,
+    key_path: str | None = None,
+) -> dict[str, Any]:
+    """Test SSH connectivity and detect installed panels/services (Pelican, CyberPanel, Docker)."""
+    import paramiko
+
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    try:
+        client.connect(
+            hostname=host,
+            port=port,
+            username=username,
+            password=password or None,
+            key_filename=key_path or None,
+            timeout=8.0,
+            banner_timeout=8.0,
+            look_for_keys=False,
+            allow_agent=False,
+        )
+        probe_cmd = (
+            "echo '---OS---'; uname -a 2>/dev/null; "
+            "echo '---DOCKER---'; which docker 2>/dev/null; "
+            "echo '---PELICAN---'; ls -d ~/pelican-panel /root/pelican-panel /var/www/pelican 2>/dev/null; "
+            "echo '---OLS---'; ls -d /usr/local/lsws 2>/dev/null; "
+            "echo '---AUTH---'; ls /var/log/auth.log /var/log/secure 2>/dev/null"
+        )
+        _stdin, stdout, _stderr = client.exec_command(probe_cmd, timeout=8.0)
+        output = stdout.read().decode("utf-8", errors="replace")
+        client.close()
+
+        has_docker = "---DOCKER---\n/" in output or "/docker" in output
+        pelican_match = [
+            line.strip()
+            for line in output.splitlines()
+            if "pelican" in line.lower() and "/" in line
+        ]
+        ols_match = "/usr/local/lsws" in output
+        uname_parts = output.split("---OS---\n")
+        uname_line = uname_parts[-1].split("\n")[0] if len(uname_parts) > 1 else "Linux"
+
+        details: list[str] = []
+        if pelican_match:
+            details.append(f"Pelican directory: {pelican_match[0]}")
+        if ols_match:
+            details.append("CyberPanel OpenLiteSpeed installed")
+        if has_docker:
+            details.append("Docker installed")
+
+        summary = " • ".join(details) if details else "Connected (Linux host)"
+        return {
+            "success": True,
+            "os": uname_line[:80],
+            "message": f"Connected to {username}@{host}. {summary}",
+        }
+    except Exception as exc:
+        return {
+            "success": False,
+            "message": f"Connection failed: {exc}",
+        }
