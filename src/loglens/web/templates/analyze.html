@@ -1,48 +1,40 @@
 {% extends "base.html" %}
 
-{% block title %}LogLens — New Security Log Analysis{% endblock %}
+{% block title %}LogLens — New Analysis{% endblock %}
 
 {% block content %}
-<div style="max-width: 900px; margin: 0 auto;">
-  <div style="margin-bottom: 2rem;">
-    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">
-      <a href="/" style="color: var(--accent-primary); text-decoration: none;">&larr; Dashboard</a> / New Analysis
-    </div>
-    <h1 style="font-size: 1.8rem; font-weight: 700; letter-spacing: -0.02em;">Analyze & Triage Logs</h1>
-    <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 0.25rem;">
-      Upload log files or paste raw log lines directly from your browser. LogLens will cluster patterns with Drain3, match MITRE ATT&CK rules, and optionally run AI forensic triage.
+<div style="max-width: 800px; margin: 0 auto;">
+  <div style="margin-bottom: 24px;">
+    <h1 style="font-size: 20px; font-weight: 600; letter-spacing: -0.01em;">New analysis</h1>
+    <p style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">
+      Upload log files or paste raw log lines to cluster patterns and evaluate threat detection rules
     </p>
   </div>
 
-  <form action="/analyze" method="post" enctype="multipart/form-data" class="card" style="padding: 2rem;">
+  <form action="/analyze" method="post" enctype="multipart/form-data" class="card" style="padding: 24px;">
     <!-- Source Selection Tabs -->
-    <div style="margin-bottom: 1.5rem;">
-      <label style="display: block; font-weight: 600; font-size: 0.95rem; margin-bottom: 0.5rem;">
-        Log Input Source
-      </label>
-      
-      <div style="display: flex; gap: 1rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.5rem;">
-        <label style="cursor: pointer; display: flex; align-items: center; gap: 0.5rem; color: var(--text-main); font-weight: 500;">
-          <input type="radio" name="input_mode" value="upload" checked onclick="document.getElementById('upload-section').style.display='block'; document.getElementById('paste-section').style.display='none';">
-          📁 Upload Log File
+    <div style="margin-bottom: 20px;">
+      <div style="display: flex; gap: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+        <label style="cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500;">
+          <input type="radio" name="input_mode" value="upload" checked onclick="document.getElementById('upload-section').style.display='block'; document.getElementById('paste-section').style.display='none';" style="accent-color: var(--accent);">
+          <span>File upload</span>
         </label>
-        <label style="cursor: pointer; display: flex; align-items: center; gap: 0.5rem; color: var(--text-main); font-weight: 500;">
-          <input type="radio" name="input_mode" value="paste" onclick="document.getElementById('upload-section').style.display='none'; document.getElementById('paste-section').style.display='block';">
-          📋 Paste Raw Log Text
+        <label style="cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--text-secondary);">
+          <input type="radio" name="input_mode" value="paste" onclick="document.getElementById('upload-section').style.display='none'; document.getElementById('paste-section').style.display='block';" style="accent-color: var(--accent);">
+          <span>Paste raw text</span>
         </label>
       </div>
 
       <!-- File Upload Section -->
       <div id="upload-section">
-        <div style="border: 2px dashed var(--border-subtle); border-radius: 8px; padding: 2rem; text-align: center; background: var(--bg-card); transition: border-color 0.2s;">
+        <div style="border: 1px dashed var(--border-strong); border-radius: 6px; padding: 32px 16px; text-align: center; background: var(--bg-card); transition: border-color 0.15s;">
           <input type="file" name="file" id="log-file" style="display: none;" onchange="updateFileName(this)">
           <label for="log-file" style="cursor: pointer; display: inline-block;">
-            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📄</div>
-            <div style="font-weight: 600; color: var(--accent-primary); font-size: 1.05rem;" id="file-label-text">
-              Click to browse or drop your log file here
+            <div style="font-weight: 500; color: var(--accent); font-size: 13px;" id="file-label-text">
+              Choose a log file or drag here
             </div>
-            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">
-              Supports .log, .txt, .json, .gz (e.g. auth.log, wings.log, access.log)
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+              Supports auth.log, laravel.log, wings.log, nginx access.log, syslog, or JSON lines
             </div>
           </label>
         </div>
@@ -50,76 +42,71 @@
 
       <!-- Paste Text Section -->
       <div id="paste-section" style="display: none;">
-        <textarea name="log_text" rows="10" placeholder="Paste server log lines here...&#10;Nov 10 12:00:01 server sshd[1024]: Failed password for root from 198.51.100.22 port 51234 ssh2&#10;Nov 10 12:00:02 server sshd[1025]: Failed password for invalid user admin from 198.51.100.22 port 51235 ssh2" style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.75rem; font-family: var(--font-mono); font-size: 0.85rem; resize: vertical;"></textarea>
+        <textarea name="log_text" rows="8" placeholder="Paste server log lines here...&#10;Nov 10 12:00:01 server sshd[1024]: Failed password for root from 198.51.100.22 port 51234 ssh2&#10;Nov 10 12:00:02 server sshd[1025]: Failed password for invalid user admin from 198.51.100.22 port 51235 ssh2" style="width: 100%; font-family: var(--font-mono); font-size: 12px; resize: vertical;"></textarea>
       </div>
     </div>
 
     <!-- Configuration Options Grid -->
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 20px;">
       <!-- Format Selector -->
       <div>
-        <label for="format" style="display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem;">
-          Log Format / Service
+        <label for="format" style="display: block; font-weight: 500; font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">
+          Log format
         </label>
-        <select name="format" id="format" style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.6rem; font-size: 0.9rem;">
-          <option value="auto" selected>✨ Auto-Detect (Recommended)</option>
-          <option value="auth">SSH / Linux Auth (auth.log, secure)</option>
-          <option value="laravel">Laravel / PHP Framework (laravel.log)</option>
-          <option value="nginx">Nginx / Apache Combined Access Log</option>
-          <option value="pterodactyl">Pterodactyl Wings / Pelican Panel (wings.log)</option>
-          <option value="minecraft">Minecraft Server Console (latest.log)</option>
-          <option value="fail2ban">Fail2ban Jails (/var/log/fail2ban.log)</option>
-          <option value="ufw">UFW / iptables Blocked Telemetry</option>
-          <option value="database_auth">Database Auth (PostgreSQL & MySQL)</option>
-          <option value="docker_json">Docker Container JSON lines</option>
-          <option value="syslog">Standard Syslog (RFC 3164)</option>
+        <select name="format" id="format" style="width: 100%;">
+          <option value="auto" selected>Auto-detect (recommended)</option>
+          <option value="auth">SSH / Linux auth (auth.log, secure)</option>
+          <option value="laravel">Laravel application (laravel.log)</option>
+          <option value="nginx">Nginx / Apache web access</option>
+          <option value="pterodactyl">Pterodactyl wings / panel (wings.log)</option>
+          <option value="minecraft">Minecraft server console (latest.log)</option>
+          <option value="fail2ban">Fail2ban (/var/log/fail2ban.log)</option>
+          <option value="ufw">UFW firewall telemetry</option>
+          <option value="database_auth">Database auth (PostgreSQL & MySQL)</option>
+          <option value="docker_json">Docker container JSON lines</option>
+          <option value="syslog">Standard syslog (RFC 3164)</option>
           <option value="json">Generic JSON lines</option>
         </select>
       </div>
 
       <!-- AI Provider Selector -->
       <div>
-        <label for="provider" style="display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem;">
-          AI Triage Provider
+        <label for="provider" style="display: block; font-weight: 500; font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">
+          Triage provider
         </label>
-        <select name="provider" id="provider" style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.6rem; font-size: 0.9rem;">
-          <option value="mock" selected>⚡ Fast Built-in Engine (Offline & Free)</option>
-          <option value="ollama">🦙 Local Ollama (llama3.2:3b / mistral)</option>
-          <option value="gemini">✨ Google Gemini Flash (Cloud Free Tier)</option>
-          <option value="openai">🤖 OpenAI (gpt-4o-mini)</option>
-          <option value="anthropic">🧠 Anthropic Claude (3.5 Sonnet)</option>
+        <select name="provider" id="provider" style="width: 100%;">
+          <option value="mock" selected>Built-in offline engine (local)</option>
+          <option value="ollama">Local Ollama (llama3.2 / mistral)</option>
+          <option value="gemini">Google Gemini Flash (cloud)</option>
+          <option value="openai">OpenAI (gpt-4o-mini)</option>
+          <option value="anthropic">Anthropic Claude (3.5 Sonnet)</option>
         </select>
       </div>
     </div>
 
     <!-- Toggles -->
-    <div style="background: var(--bg-card); border-radius: 6px; padding: 1rem; border: 1px solid var(--border-subtle); margin-bottom: 2rem;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+    <div style="background: var(--bg-card); border-radius: 6px; padding: 12px 14px; border: 1px solid var(--border); margin-bottom: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
         <div>
-          <div style="font-weight: 600; font-size: 0.9rem;">Pre-run AI Triage on Ingest</div>
-          <div style="font-size: 0.8rem; color: var(--text-muted);">
-            Leave unchecked for instant analysis. You can trigger "Explain with AI" on-demand for any finding or error anytime.
-          </div>
+          <div style="font-weight: 500; font-size: 13px;">Pre-run AI triage on ingest</div>
+          <div style="font-size: 12px; color: var(--text-muted);">Automatically triage detected security findings immediately after parsing</div>
         </div>
-        <input type="checkbox" name="enable_llm" value="true" style="width: 1.25rem; height: 1.25rem; accent-color: var(--accent-primary); cursor: pointer;">
+        <input type="checkbox" name="enable_llm" value="true" checked style="accent-color: var(--accent); width: 15px; height: 15px;">
       </div>
-
-      <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 10px;">
         <div>
-          <div style="font-weight: 600; font-size: 0.9rem;">Auto-Dispatch Alert Notifications</div>
-          <div style="font-size: 0.8rem; color: var(--text-muted);">
-            If threats are identified, immediately notify your configured Telegram or Discord channels.
-          </div>
+          <div style="font-weight: 500; font-size: 13px;">Dispatch alerts on completion</div>
+          <div style="font-size: 12px; color: var(--text-muted);">Send findings meeting severity policy to Discord/Telegram</div>
         </div>
-        <input type="checkbox" name="notify_on_complete" value="true" style="width: 1.25rem; height: 1.25rem; accent-color: var(--accent-primary); cursor: pointer;">
+        <input type="checkbox" name="notify_on_complete" value="true" checked style="accent-color: var(--accent); width: 15px; height: 15px;">
       </div>
     </div>
 
-    <!-- Submit Button -->
-    <div style="display: flex; justify-content: flex-end; gap: 1rem; align-items: center;">
+    <!-- Submit Action -->
+    <div style="display: flex; justify-content: flex-end; gap: 8px; align-items: center;">
       <a href="/" class="btn btn-secondary">Cancel</a>
-      <button type="submit" class="btn btn-primary" style="padding: 0.75rem 2rem; font-size: 1rem; font-weight: 600;">
-        🚀 Start Triage Analysis
+      <button type="submit" class="btn btn-primary">
+        Analyze logs
       </button>
     </div>
   </form>
@@ -129,10 +116,8 @@
   function updateFileName(input) {
     const label = document.getElementById('file-label-text');
     if (input.files && input.files[0]) {
-      label.textContent = 'Selected: ' + input.files[0].name + ' (' + (input.files[0].size / 1024).toFixed(1) + ' KB)';
-      label.style.color = '#10b981';
+      label.textContent = 'Selected: ' + input.files[0].name;
     }
   }
 </script>
 {% endblock %}
-

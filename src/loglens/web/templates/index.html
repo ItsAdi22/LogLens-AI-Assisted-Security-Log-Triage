@@ -1,21 +1,22 @@
 {% extends "base.html" %}
 
-{% block title %}LogLens — Triage History & Dashboard{% endblock %}
+{% block title %}LogLens — Security Triage Operations{% endblock %}
 
 {% block content %}
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
   <div>
-    <h1 style="font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em;">Security Triage Operations</h1>
-    <p style="color: var(--text-muted); font-size: 0.95rem;">Historical runs, clustered log intelligence, and automated threat detections.</p>
+    <h1 style="font-size: 20px; font-weight: 600; letter-spacing: -0.01em;">Security triage</h1>
+    <p style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">Ingestion runs, mined clusters, and automated threat detections</p>
   </div>
-  <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
-    <a href="/analyze" class="btn btn-primary" style="font-weight: 600;">+ New Analysis</a>
-    <a href="/settings" class="btn btn-secondary">🔔 Alerts & Settings</a>
-    <a href="/api/runs" class="btn btn-secondary" target="_blank">Export JSON</a>
+  <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+    <a href="/analyze" class="btn btn-primary btn-sm">+ New analysis</a>
+    <a href="/live" class="btn btn-secondary btn-sm">Live monitor</a>
+    <a href="/settings" class="btn btn-secondary btn-sm">Settings</a>
+    <a href="/api/runs" class="btn btn-secondary btn-sm" target="_blank">Export JSON</a>
     {% if runs %}
-      <form action="/api/runs/clear" method="post" style="display: inline; margin: 0;" onsubmit="return confirm('Are you sure you want to clear all triage runs and security findings? This action cannot be undone.');">
-        <button type="submit" class="btn" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); font-weight: 500;">
-          🗑️ Clear All Runs
+      <form action="/api/runs/clear" method="post" style="display: inline; margin: 0;" onsubmit="return confirm('Clear all triage runs and security findings? This cannot be undone.');">
+        <button type="submit" class="btn btn-danger btn-sm">
+          Clear all runs
         </button>
       </form>
     {% endif %}
@@ -25,136 +26,145 @@
 <!-- Global Metrics -->
 <div class="metric-grid">
   <div class="metric-box">
-    <div class="metric-label">Total Ingestion Runs</div>
+    <div class="metric-label">Ingestion runs</div>
     <div class="metric-value">{{ stats.total_runs }}</div>
   </div>
   <div class="metric-box">
-    <div class="metric-label">Parsed Log Events</div>
+    <div class="metric-label">Parsed log events</div>
     <div class="metric-value">{{ "{:,}".format(stats.total_events) }}</div>
   </div>
   <div class="metric-box">
-    <div class="metric-label">Mined Clusters</div>
+    <div class="metric-label">Mined clusters</div>
     <div class="metric-value">{{ stats.total_clusters }}</div>
   </div>
   <div class="metric-box">
-    <div class="metric-label">Security Findings</div>
-    <div class="metric-value" style="color: {% if stats.total_findings > 0 %}#f87171{% else %}var(--text-main){% endif %};">
+    <div class="metric-label">Security findings</div>
+    <div class="metric-value" style="color: {% if stats.total_findings > 0 %}#f87171{% else %}var(--text-primary){% endif %};">
       {{ stats.total_findings }}
     </div>
   </div>
 </div>
 
-<!-- Severity Breakdown & Timeline Trend -->
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+<!-- Severity Breakdown & Activity Trend -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap: 16px; margin-bottom: 20px;">
   <div class="card" style="margin-bottom: 0;">
-    <h3 style="font-size: 1rem; margin-bottom: 1rem; color: var(--text-muted); text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.05em;">
-      Threat Severity Distribution
-    </h3>
-    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+    <div class="card-header">
+      <div>
+        <h2 class="card-title">Threat severity distribution</h2>
+        <p class="card-subtitle">Aggregated findings categorized by rule severity</p>
+      </div>
+    </div>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
       <span class="badge badge-critical">Critical: {{ stats.severity_counts.critical }}</span>
       <span class="badge badge-high">High: {{ stats.severity_counts.high }}</span>
       <span class="badge badge-medium">Medium: {{ stats.severity_counts.medium }}</span>
       <span class="badge badge-low">Low: {{ stats.severity_counts.low }}</span>
       <span class="badge badge-info">Info: {{ stats.severity_counts.info }}</span>
     </div>
-    <div style="margin-top: 1.5rem; height: 12px; border-radius: 6px; overflow: hidden; display: flex; background: var(--bg-card);">
+    <div style="margin-top: 20px; height: 6px; border-radius: 3px; overflow: hidden; display: flex; background: var(--bg-card);">
       {% set total = stats.total_findings %}
       {% if total > 0 %}
         <div style="width: {{ (stats.severity_counts.critical / total) * 100 }}%; background: #ef4444;" title="Critical"></div>
         <div style="width: {{ (stats.severity_counts.high / total) * 100 }}%; background: #f97316;" title="High"></div>
         <div style="width: {{ (stats.severity_counts.medium / total) * 100 }}%; background: #eab308;" title="Medium"></div>
-        <div style="width: {{ (stats.severity_counts.low / total) * 100 }}%; background: #3b82f6;" title="Low"></div>
+        <div style="width: {{ (stats.severity_counts.low / total) * 100 }}%; background: #38bdf8;" title="Low"></div>
         <div style="width: {{ (stats.severity_counts.info / total) * 100 }}%; background: #64748b;" title="Info"></div>
       {% else %}
-        <div style="width: 100%; background: #334155;" title="Clean"></div>
+        <div style="width: 100%; background: var(--bg-raised);" title="Clean"></div>
       {% endif %}
     </div>
   </div>
 
   <div class="card" style="margin-bottom: 0;">
-    <h3 style="font-size: 1rem; margin-bottom: 1rem; color: var(--text-muted); text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.05em;">
-      7-Day Ingestion & Incident Activity
-    </h3>
+    <div class="card-header">
+      <div>
+        <h2 class="card-title">7-day activity</h2>
+        <p class="card-subtitle">Historical ingestion volume and incident alerts</p>
+      </div>
+    </div>
     {% if timeline %}
-      <div style="display: flex; align-items: flex-end; gap: 1rem; height: 80px; padding-top: 10px;">
+      <div style="display: flex; align-items: flex-end; gap: 12px; height: 70px; padding-top: 8px;">
         {% for day in timeline %}
-          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.25rem;">
-            <div style="font-size: 0.7rem; color: var(--text-muted);">{{ day.total_findings }} f</div>
-            <div style="width: 100%; max-width: 28px; background: {% if day.total_findings > 0 %}#f87171{% else %}var(--accent-primary){% endif %}; height: {{ [day.run_count * 15, 60] | min }}px; border-radius: 4px;" title="{{ day.day }}: {{ day.run_count }} runs, {{ day.total_findings }} findings"></div>
-            <div style="font-size: 0.65rem; color: var(--text-muted); font-family: var(--font-mono);">{{ day.day[-5:] }}</div>
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+            <div style="font-size: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums;">{{ day.total_findings }}f</div>
+            <div style="width: 100%; max-width: 24px; background: {% if day.total_findings > 0 %}#f87171{% else %}var(--accent){% endif %}; height: {{ [day.run_count * 12, 50] | min }}px; border-radius: 2px;" title="{{ day.day }}: {{ day.run_count }} runs, {{ day.total_findings }} findings"></div>
+            <div style="font-size: 10px; color: var(--text-muted); font-family: var(--font-mono);">{{ day.day[-5:] }}</div>
           </div>
         {% endfor %}
       </div>
     {% else %}
-      <p style="color: var(--text-muted); font-size: 0.9rem;">No historical timeline events recorded yet.</p>
+      <p style="color: var(--text-muted); font-size: 13px;">No historical timeline events recorded yet</p>
     {% endif %}
   </div>
 </div>
 
 <!-- Historical Runs Table -->
 <div class="card">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-    <h2 style="font-size: 1.15rem; font-weight: 600;">Recent Ingestion Runs</h2>
-    <span style="color: var(--text-muted); font-size: 0.85rem;">Showing up to {{ runs|length }} latest runs</span>
+  <div class="card-header">
+    <div>
+      <h2 class="card-title">Recent ingestion runs</h2>
+      <p class="card-subtitle">Showing {{ runs|length }} latest triage analyses</p>
+    </div>
   </div>
 
   {% if runs %}
-    <table>
-      <thead>
-        <tr>
-          <th>Run ID</th>
-          <th>Generated At</th>
-          <th>Log Target</th>
-          <th>Parsed Events</th>
-          <th>Clusters</th>
-          <th>Findings</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for run in runs %}
+    <div style="overflow-x: auto;">
+      <table>
+        <thead>
           <tr>
-            <td>
-              <a href="/runs/{{ run.run_id }}" style="color: var(--accent-primary); font-family: var(--font-mono); text-decoration: none; font-weight: 600;">
-                {{ run.run_id }}
-              </a>
-            </td>
-            <td style="color: var(--text-muted); font-size: 0.85rem;">{{ run.generated_at }}</td>
-            <td><span class="code">{{ run.log_source }}</span></td>
-            <td>{{ "{:,}".format(run.parsed_events) }}</td>
-            <td>{{ run.total_clusters }}</td>
-            <td>
-              {% if run.findings_count > 0 %}
-                <span class="badge badge-high">{{ run.findings_count }} Findings</span>
-              {% else %}
-                <span class="badge badge-info">0 Findings</span>
-              {% endif %}
-            </td>
-            <td>
-              <div style="display: flex; gap: 0.4rem; align-items: center;">
-                <a href="/runs/{{ run.run_id }}" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;">
-                  Inspect
-                </a>
-                <form action="/runs/{{ run.run_id }}/delete" method="post" style="display: inline; margin: 0;" onsubmit="return confirm('Delete run {{ run.run_id }}?');">
-                  <button type="submit" class="btn" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25);" title="Delete this run">
-                    🗑️
-                  </button>
-                </form>
-              </div>
-            </td>
+            <th>Run ID</th>
+            <th>Timestamp</th>
+            <th>Log source</th>
+            <th>Events</th>
+            <th>Clusters</th>
+            <th>Findings</th>
+            <th style="text-align: right;">Actions</th>
           </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {% for run in runs %}
+            <tr>
+              <td>
+                <a href="/runs/{{ run.run_id }}" style="color: var(--accent); font-family: var(--font-mono); text-decoration: none; font-weight: 500;">
+                  {{ run.run_id }}
+                </a>
+              </td>
+              <td style="color: var(--text-secondary); font-size: 12px; font-variant-numeric: tabular-nums;">{{ run.generated_at }}</td>
+              <td><span class="code">{{ run.log_source }}</span></td>
+              <td style="font-variant-numeric: tabular-nums;">{{ "{:,}".format(run.parsed_events) }}</td>
+              <td style="font-variant-numeric: tabular-nums;">{{ run.total_clusters }}</td>
+              <td>
+                {% if run.findings_count > 0 %}
+                  <span class="badge badge-high">{{ run.findings_count }} findings</span>
+                {% else %}
+                  <span class="badge badge-info">0 findings</span>
+                {% endif %}
+              </td>
+              <td style="text-align: right;">
+                <div style="display: inline-flex; gap: 6px; align-items: center;">
+                  <a href="/runs/{{ run.run_id }}" class="btn btn-secondary btn-sm">
+                    Inspect
+                  </a>
+                  <form action="/runs/{{ run.run_id }}/delete" method="post" style="display: inline; margin: 0;" onsubmit="return confirm('Delete run {{ run.run_id }}?');">
+                    <button type="submit" class="btn btn-danger btn-sm" title="Delete run">
+                      Delete
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   {% else %}
-    <div style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
-      <p style="font-size: 1.1rem; margin-bottom: 0.5rem; color: var(--text-main);">No triage runs recorded yet.</p>
-      <p style="font-size: 0.9rem; margin-bottom: 1.5rem;">Execute your first analysis using the CLI:</p>
-      <div style="display: inline-block; background: var(--bg-card); padding: 0.75rem 1.5rem; border-radius: 6px; font-family: var(--font-mono); font-size: 0.9rem; border: 1px solid var(--border-subtle);">
+    <div style="text-align: center; padding: 40px 16px; color: var(--text-muted);">
+      <p style="font-size: 14px; margin-bottom: 6px; color: var(--text-primary);">No triage runs recorded yet</p>
+      <p style="font-size: 13px; margin-bottom: 16px;">Execute your first analysis using the CLI or New analysis above:</p>
+      <div style="display: inline-block; background: var(--bg-card); padding: 8px 16px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px; border: 1px solid var(--border);">
         loglens analyze /var/log/auth.log --no-llm
       </div>
     </div>
   {% endif %}
 </div>
 {% endblock %}
-

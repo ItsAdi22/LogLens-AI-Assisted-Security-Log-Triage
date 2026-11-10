@@ -1,139 +1,131 @@
 {% extends "base.html" %}
 
-{% block title %}LogLens — Live Server Monitoring & Stream Ingestion{% endblock %}
+{% block title %}LogLens — Live Monitor{% endblock %}
 
 {% block content %}
-<div style="margin-bottom: 2rem;">
-  <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">
-    <a href="/" style="color: var(--accent-primary); text-decoration: none;">&larr; Dashboard</a> / Live Monitoring
-  </div>
-  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+<div style="margin-bottom: 24px;">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
     <div>
-      <h1 style="font-size: 1.8rem; font-weight: 700; letter-spacing: -0.02em; display: flex; align-items: center; gap: 0.6rem;">
-        <span>📡</span> Live Server Monitoring & Real-Time Streams
-      </h1>
-      <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 0.25rem;">
-        Continuously tail server log files, pipe remote VPS logs via HTTP streaming, and auto-dispatch critical threats to Discord &amp; Telegram.
+      <h1 style="font-size: 20px; font-weight: 600; letter-spacing: -0.01em;">Live server monitor</h1>
+      <p style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">
+        Tail local log files in real-time or forward remote VPS streams over HTTP
       </p>
     </div>
-    <div style="display: flex; gap: 0.75rem;">
-      <a href="/settings" class="btn btn-secondary">⚡ Anti-Spam Alerts</a>
-      <a href="/analyze" class="btn btn-secondary">+ Manual Upload</a>
+    <div style="display: flex; gap: 8px;">
+      <a href="/settings" class="btn btn-secondary btn-sm">Alert settings</a>
+      <a href="/analyze" class="btn btn-secondary btn-sm">Manual analysis</a>
     </div>
   </div>
 </div>
 
-<!-- Section 1: Active Local Watchers & Watch Starter -->
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+<!-- Section 1: Local Watch Starter & Active Watchers -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 1fr)); gap: 16px; margin-bottom: 24px;">
   <!-- Start Local / Server File Watch -->
   <div class="card" style="margin-bottom: 0;">
-    <h3 style="font-size: 1.15rem; font-weight: 600; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
-      <span>👁️</span> Watch Local / Server Log File
-    </h3>
-    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.25rem;">
-      Tails a local server file in real-time, clusters new events into Drain3, and automatically triggers alerts when attacks occur.
-    </p>
+    <div class="card-header">
+      <div>
+        <h2 class="card-title">Watch local log file</h2>
+        <p class="card-subtitle">Tails a file on this server and clusters new events</p>
+      </div>
+    </div>
 
     <form action="/live/start" method="post">
-      <div style="margin-bottom: 1rem;">
-        <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; font-weight: 500;">
-          Server File Path
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-weight: 500;">
+          File path
         </label>
         <input type="text" name="log_path" required
                placeholder="/var/log/auth.log or /var/www/pterodactyl/storage/logs/laravel.log"
-               style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.6rem; font-family: var(--font-mono); font-size: 0.85rem;">
-        <div style="display: flex; gap: 0.5rem; margin-top: 0.4rem; flex-wrap: wrap;">
-          <span style="font-size: 0.75rem; color: var(--text-muted);">Quick fill:</span>
-          <a href="#" onclick="document.querySelector('input[name=log_path]').value='/var/log/auth.log'; return false;" style="font-size: 0.75rem; color: var(--accent-primary);">/var/log/auth.log</a>
-          <a href="#" onclick="document.querySelector('input[name=log_path]').value='/var/log/nginx/access.log'; return false;" style="font-size: 0.75rem; color: var(--accent-primary);">nginx access.log</a>
-          <a href="#" onclick="document.querySelector('input[name=log_path]').value='/var/www/pterodactyl/storage/logs/laravel.log'; return false;" style="font-size: 0.75rem; color: var(--accent-primary);">Pterodactyl laravel.log</a>
+               style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+        <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; align-items: center;">
+          <span style="font-size: 11px; color: var(--text-muted);">Presets:</span>
+          <a href="#" onclick="document.querySelector('input[name=log_path]').value='/var/log/auth.log'; return false;" style="font-size: 11px; color: var(--accent); text-decoration: none;">auth.log</a>
+          <span style="color: var(--border-strong);">&bull;</span>
+          <a href="#" onclick="document.querySelector('input[name=log_path]').value='/var/log/nginx/access.log'; return false;" style="font-size: 11px; color: var(--accent); text-decoration: none;">nginx access.log</a>
+          <span style="color: var(--border-strong);">&bull;</span>
+          <a href="#" onclick="document.querySelector('input[name=log_path]').value='/var/www/pterodactyl/storage/logs/laravel.log'; return false;" style="font-size: 11px; color: var(--accent); text-decoration: none;">Pterodactyl laravel.log</a>
         </div>
       </div>
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
         <div>
-          <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; font-weight: 500;">
-            Poll Interval (seconds)
+          <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-weight: 500;">
+            Poll interval (seconds)
           </label>
           <input type="number" name="interval" value="2.0" step="0.5" min="0.5" max="60.0"
-                 style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.6rem; font-size: 0.85rem;">
+                 style="width: 100%; font-variant-numeric: tabular-nums;">
         </div>
-        <div style="display: flex; align-items: flex-end; padding-bottom: 0.6rem;">
-          <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
-            <input type="checkbox" name="from_start" value="true" style="accent-color: var(--accent-primary);">
-            <span>Scan from start of file</span>
+        <div style="display: flex; align-items: flex-end; padding-bottom: 8px;">
+          <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); cursor: pointer;">
+            <input type="checkbox" name="from_start" value="true" style="accent-color: var(--accent);">
+            <span>Scan from start</span>
           </label>
         </div>
       </div>
 
-      <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; font-weight: 600; padding: 0.65rem;">
-        ▶️ Start Live Watch
+      <button type="submit" class="btn btn-primary" style="width: 100%;">
+        Start watch
       </button>
     </form>
   </div>
 
   <!-- Active Watchers List -->
   <div class="card" style="margin-bottom: 0;">
-    <h3 style="font-size: 1.15rem; font-weight: 600; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
-      <span>🟢</span> Running Server Watchers
-    </h3>
-    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.25rem;">
-      Background tail processes currently scanning log files on this machine.
-    </p>
+    <div class="card-header">
+      <div>
+        <h2 class="card-title">Active watchers</h2>
+        <p class="card-subtitle">Background tail processes running on this machine</p>
+      </div>
+    </div>
 
     {% if sessions %}
-      <div style="display: flex; flex-direction: column; gap: 0.75rem; max-height: 280px; overflow-y: auto;">
+      <div style="display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto;">
         {% for s in sessions %}
-          <div style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <span class="badge {% if s.status == 'ACTIVE' %}badge-info{% elif s.status == 'STOPPED' %}badge-low{% else %}badge-critical{% endif %}" style="font-size: 0.7rem;">
-                  {{ s.status }}
-                </span>
-                <span style="font-weight: 600; font-size: 0.9rem; font-family: var(--font-mono);">{{ s.file_name }}</span>
+          <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+            <div style="min-width: 0;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span class="live-dot" style="background: {% if s.status == 'ACTIVE' %}#10b981{% elif s.status == 'STOPPED' %}#64748b{% else %}#ef4444{% endif %};"></span>
+                <span style="font-weight: 500; font-size: 13px; font-family: var(--font-mono);">{{ s.file_name }}</span>
+                <span class="badge badge-info" style="font-size: 10px;">{{ s.status|lower }}</span>
               </div>
-              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">
-                Path: <span class="code" style="font-size: 0.75rem;">{{ s.log_path }}</span> &bull; Findings: <strong style="color: #f87171;">{{ s.total_findings }}</strong>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                {{ s.log_path }} &bull; <span style="font-variant-numeric: tabular-nums;">{{ s.total_findings }} findings</span>
               </div>
             </div>
             <div>
               {% if s.status == 'ACTIVE' %}
                 <form action="/live/stop" method="post" style="margin: 0;">
                   <input type="hidden" name="session_id" value="{{ s.session_id }}">
-                  <button type="submit" class="btn" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); font-size: 0.75rem; padding: 0.3rem 0.6rem;">
-                    ⏹️ Stop
+                  <button type="submit" class="btn btn-danger btn-sm">
+                    Stop
                   </button>
                 </form>
               {% else %}
-                <span style="font-size: 0.75rem; color: var(--text-muted);">Inactive</span>
+                <span style="font-size: 11px; color: var(--text-muted);">Stopped</span>
               {% endif %}
             </div>
           </div>
         {% endfor %}
       </div>
     {% else %}
-      <div style="text-align: center; padding: 3rem 1rem; color: var(--text-muted); background: var(--bg-card); border-radius: 6px;">
-        <p style="font-size: 0.95rem; color: var(--text-main); margin-bottom: 0.25rem;">No background watchers active.</p>
-        <p style="font-size: 0.8rem;">Enter a server path on the left to start live log tailing.</p>
+      <div style="text-align: center; padding: 36px 16px; color: var(--text-muted); background: var(--bg-card); border-radius: 6px; border: 1px dashed var(--border);">
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 4px;">No active background watchers</p>
+        <p style="font-size: 12px;">Enter a file path on the left to start continuous tailing</p>
       </div>
     {% endif %}
   </div>
 </div>
 
 <!-- Section 2: Real-time Live Activity Stream Feed -->
-<div class="card" style="margin-bottom: 2rem;">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+<div class="card" style="margin-bottom: 24px;">
+  <div class="card-header">
     <div>
-      <h3 style="font-size: 1.15rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
-        <span>⚡</span> Real-Time Live Activity Stream
-      </h3>
-      <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.2rem;">
-        Auto-refreshes every 3 seconds via HTMX live polling. Displays incoming stream events and background detections.
-      </p>
+      <h2 class="card-title">Activity stream</h2>
+      <p class="card-subtitle">Real-time ledger of parsed lines, clusters, and detections</p>
     </div>
-    <div style="display: flex; align-items: center; gap: 0.5rem;">
-      <span class="spinner" style="width: 0.75rem; height: 0.75rem; border-color: rgba(6, 182, 212, 0.3); border-top-color: var(--accent-primary);"></span>
-      <span style="font-size: 0.75rem; color: var(--accent-primary); font-family: var(--font-mono);">POLLING LIVE</span>
+    <div style="display: flex; align-items: center; gap: 6px;">
+      <span class="live-dot"></span>
+      <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">Live polling</span>
     </div>
   </div>
 
@@ -146,49 +138,46 @@
 </div>
 
 <!-- Section 3: Connect Remote VPS & Panels (Pterodactyl, Pelican, Docker) -->
-<div class="card" style="border-color: rgba(6, 182, 212, 0.3);">
-  <div style="margin-bottom: 1.25rem;">
-    <h3 style="font-size: 1.2rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; color: var(--text-main);">
-      <span>🌐</span> Connect Remote Servers &amp; VPS Panels
-    </h3>
-    <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">
-      If your game servers, Pterodactyl, or Pelican VPS runs on a separate machine, pipe logs directly into LogLens over HTTP using this live ingestion endpoint:
-    </p>
-    <div style="margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
-      <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Ingestion Endpoint:</span>
-      <span class="code" style="color: var(--accent-primary); font-size: 0.85rem;">POST /api/ingest/stream</span>
+<div class="card">
+  <div class="card-header" style="margin-bottom: 12px;">
+    <div>
+      <h2 class="card-title">Remote server forwarding</h2>
+      <p class="card-subtitle">Pipe logs from external VPS hosts, containers, or game panels into LogLens via HTTP</p>
+    </div>
+    <div>
+      <span class="code" style="font-size: 11px;">POST /api/ingest/stream</span>
     </div>
   </div>
 
-  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap: 16px;">
     <!-- Box 1: Pterodactyl & Pelican Logs -->
-    <div style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 1rem;">
-      <div style="font-weight: 600; font-size: 0.95rem; margin-bottom: 0.4rem; color: #6ee7b7; display: flex; align-items: center; gap: 0.4rem;">
-        <span>🎮</span> Pterodactyl &amp; Pelican Game Panel Logs
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 14px; min-width: 0;">
+      <div style="font-weight: 500; font-size: 13px; margin-bottom: 4px; color: var(--text-primary);">
+        Pterodactyl &amp; Pelican panel logs
       </div>
-      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
-        Run this in your VPS terminal to continuously pipe panel logs to LogLens in real-time:
+      <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
+        Pipe panel logs in real time from your game server VPS:
       </p>
-      <pre style="background: #0b1120; border: 1px solid var(--border-subtle); border-radius: 4px; padding: 0.6rem; font-family: var(--font-mono); font-size: 0.75rem; color: #f8fafc; overflow-x: auto; white-space: pre-wrap;">tail -F /var/www/pterodactyl/storage/logs/laravel-$(date +%Y-%m-%d).log | curl -s -X POST http://&lt;YOUR_IP&gt;:8080/api/ingest/stream -H "X-Log-Source: pterodactyl-panel" -T -</pre>
-      <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">
+      <pre>tail -F /var/www/pterodactyl/storage/logs/laravel-$(date +%Y-%m-%d).log | curl -s -X POST http://&lt;HOST&gt;:8080/api/ingest/stream -H "X-Log-Source: pterodactyl-panel" -T -</pre>
+      <div style="font-size: 12px; color: var(--text-secondary); margin: 10px 0 4px 0;">
         Or for Pelican / Wings Docker daemon:
       </div>
-      <pre style="background: #0b1120; border: 1px solid var(--border-subtle); border-radius: 4px; padding: 0.6rem; font-family: var(--font-mono); font-size: 0.75rem; color: #f8fafc; overflow-x: auto; margin-top: 0.25rem;">docker logs -f pterodactyl-wings | curl -s -X POST http://&lt;YOUR_IP&gt;:8080/api/ingest/stream -H "X-Log-Source: pterodactyl-wings" -T -</pre>
+      <pre>docker logs -f pterodactyl-wings | curl -s -X POST http://&lt;HOST&gt;:8080/api/ingest/stream -H "X-Log-Source: pterodactyl-wings" -T -</pre>
     </div>
 
     <!-- Box 2: Linux SSH / Nginx / Syslog Forwarder -->
-    <div style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 1rem;">
-      <div style="font-weight: 600; font-size: 0.95rem; margin-bottom: 0.4rem; color: #93c5fd; display: flex; align-items: center; gap: 0.4rem;">
-        <span>🐧</span> Linux SSH &amp; Nginx Web Logs
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 14px; min-width: 0;">
+      <div style="font-weight: 500; font-size: 13px; margin-bottom: 4px; color: var(--text-primary);">
+        Linux SSH &amp; web access logs
       </div>
-      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
-        Forward SSH auth failures or web proxy access logs directly from any remote Linux server:
+      <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
+        Forward SSH auth failures or web proxy access logs:
       </p>
-      <pre style="background: #0b1120; border: 1px solid var(--border-subtle); border-radius: 4px; padding: 0.6rem; font-family: var(--font-mono); font-size: 0.75rem; color: #f8fafc; overflow-x: auto; white-space: pre-wrap;">tail -F /var/log/auth.log | curl -s -X POST http://&lt;YOUR_IP&gt;:8080/api/ingest/stream -H "X-Log-Source: vps-auth.log" -T -</pre>
-      <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">
-        For Nginx or Caddy web server logs:
+      <pre>tail -F /var/log/auth.log | curl -s -X POST http://&lt;HOST&gt;:8080/api/ingest/stream -H "X-Log-Source: vps-auth.log" -T -</pre>
+      <div style="font-size: 12px; color: var(--text-secondary); margin: 10px 0 4px 0;">
+        For Nginx or reverse proxy logs:
       </div>
-      <pre style="background: #0b1120; border: 1px solid var(--border-subtle); border-radius: 4px; padding: 0.6rem; font-family: var(--font-mono); font-size: 0.75rem; color: #f8fafc; overflow-x: auto; margin-top: 0.25rem;">tail -F /var/log/nginx/access.log | curl -s -X POST http://&lt;YOUR_IP&gt;:8080/api/ingest/stream -H "X-Log-Source: nginx-access.log" -T -</pre>
+      <pre>tail -F /var/log/nginx/access.log | curl -s -X POST http://&lt;HOST&gt;:8080/api/ingest/stream -H "X-Log-Source: nginx-access.log" -T -</pre>
     </div>
   </div>
 </div>

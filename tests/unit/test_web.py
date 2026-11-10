@@ -111,7 +111,7 @@ def test_dashboard_with_runs(tmp_path: Path) -> None:
     assert response.status_code == 200
     assert run_id in response.text
     assert "/var/log/auth.log" in response.text
-    assert "1 Findings" in response.text
+    assert "1 findings" in response.text
 
 
 def test_run_detail_found(tmp_path: Path) -> None:
@@ -155,7 +155,7 @@ def test_explain_finding_on_demand_htmx(tmp_path: Path) -> None:
     # Post HTMX explain request
     response = client.post(f"/runs/{run_id}/findings/f-01/explain")
     assert response.status_code == 200
-    assert "AI Threat Assessment" in response.text
+    assert "Forensic assessment" in response.text
     assert "Confidence:" in response.text
 
     # Verify assessment persisted in SQLite
@@ -230,8 +230,8 @@ def test_analyze_page_get(tmp_path: Path) -> None:
 
     response = client.get("/analyze")
     assert response.status_code == 200
-    assert "Analyze & Triage Logs" in response.text
-    assert "Log Input Source" in response.text
+    assert "New analysis" in response.text
+    assert "File upload" in response.text
 
 
 def test_analyze_submit_pasted_text(tmp_path: Path) -> None:
@@ -305,7 +305,7 @@ def test_settings_page_and_save(tmp_path: Path) -> None:
     # GET /settings
     res_get = client.get("/settings")
     assert res_get.status_code == 200
-    assert "Third-Party Alerts & Notifications" in res_get.text
+    assert "Alert settings" in res_get.text
 
     # POST /settings
     res_post = client.post(
@@ -319,7 +319,7 @@ def test_settings_page_and_save(tmp_path: Path) -> None:
         },
     )
     assert res_post.status_code == 200
-    assert "Settings Saved Successfully!" in res_post.text
+    assert "Settings saved successfully" in res_post.text
     assert "tok123" in res_post.text
     assert "chat456" in res_post.text
 
@@ -421,9 +421,9 @@ def test_run_detail_with_errors_and_grid(tmp_path: Path) -> None:
     resp = client.get(f"/runs/{run_id}")
     assert resp.status_code == 200
     assert "findings-grid" in resp.text
-    assert "Application & System Errors" in resp.text
+    assert "Application errors" in resp.text
     assert "Database / SQL Error" in resp.text
-    assert "Explain Error with AI" in resp.text
+    assert "Explain error" in resp.text
 
 
 def test_explain_cluster_on_demand_htmx(tmp_path: Path) -> None:
@@ -547,7 +547,7 @@ def test_delete_run_and_clear_all_runs_endpoints(tmp_path: Path) -> None:
     # Verify table empty
     res_dash = client.get("/")
     assert res_dash.status_code == 200
-    assert "No triage runs recorded yet." in res_dash.text
+    assert "No triage runs recorded yet" in res_dash.text
 
 
 def test_live_monitoring_endpoints(tmp_path: Path) -> None:
@@ -561,8 +561,8 @@ def test_live_monitoring_endpoints(tmp_path: Path) -> None:
     # 1. GET /live page
     res_live = client.get("/live")
     assert res_live.status_code == 200
-    assert "Live Server Monitoring" in res_live.text
-    assert "Connect Remote Servers" in res_live.text
+    assert "Live server monitor" in res_live.text
+    assert "Remote server forwarding" in res_live.text
 
     # 2. POST /live/start missing file fails with 404
     res_fail = client.post("/live/start", data={"log_path": str(tmp_path / "none.log")})
@@ -645,7 +645,7 @@ def test_settings_auto_notify_anti_spam(tmp_path: Path) -> None:
         },
     )
     assert res.status_code == 200
-    assert "Settings Saved Successfully!" in res.text
+    assert "Settings saved successfully" in res.text
 
     storage = StorageManager(db_file)
     assert storage.get_setting("auto_notify_enabled") == "true"

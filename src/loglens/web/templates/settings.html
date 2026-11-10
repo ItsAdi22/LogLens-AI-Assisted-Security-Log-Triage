@@ -1,111 +1,98 @@
 {% extends "base.html" %}
 
-{% block title %}LogLens — Notifications & Integrations{% endblock %}
+{% block title %}LogLens — Settings{% endblock %}
 
 {% block content %}
-<div style="max-width: 900px; margin: 0 auto;">
-  <div style="margin-bottom: 2rem;">
-    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">
-      <a href="/" style="color: var(--accent-primary); text-decoration: none;">&larr; Dashboard</a> / Notifications & Settings
-    </div>
-    <h1 style="font-size: 1.8rem; font-weight: 700; letter-spacing: -0.02em;">Third-Party Alerts & Notifications</h1>
-    <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 0.25rem;">
-      Connect Telegram, Discord, or custom webhooks to receive real-time alerts when security threats or anomalous bursts are detected.
+<div style="max-width: 860px; margin: 0 auto;">
+  <div style="margin-bottom: 24px;">
+    <h1 style="font-size: 20px; font-weight: 600; letter-spacing: -0.01em;">Alert settings</h1>
+    <p style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">
+      Configure automated notification rules, channel credentials, and storage maintenance
     </p>
   </div>
 
   {% if saved %}
-    <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #6ee7b7; padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
-      <span style="font-size: 1.25rem;">✓</span>
-      <div>
-        <strong>Settings Saved Successfully!</strong> Your notification credentials have been updated and are active.
-      </div>
+    <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); color: #6ee7b7; padding: 10px 14px; border-radius: 6px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; font-size: 13px;">
+      <span class="live-dot"></span>
+      <span>Settings saved successfully. Changes are now active.</span>
     </div>
   {% endif %}
 
   <form action="/settings" method="post">
     <!-- Automated Dispatch & Anti-Spam Policy Card -->
-    <div class="card" style="margin-bottom: 1.5rem; border-color: rgba(6, 182, 212, 0.3); background: rgba(15, 23, 42, 0.8);">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem;">
+    <div class="card">
+      <div class="card-header">
         <div>
-          <h3 style="font-size: 1.15rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; color: var(--accent-primary);">
-            <span>⚡</span> Automated Alert Dispatch & Anti-Spam Filter
-          </h3>
-          <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem;">
-            Automatically push notifications to Discord or Telegram when high-risk threats are identified—without manual intervention or channel spam.
-          </p>
+          <h2 class="card-title">Automated alert dispatch</h2>
+          <p class="card-subtitle">Automatically push notifications on high-severity detections to avoid manual intervention</p>
         </div>
       </div>
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 16px;">
         <div>
-          <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-size: 0.95rem; font-weight: 600; margin-bottom: 0.6rem;">
-            <input type="checkbox" name="auto_notify_enabled" value="true" {% if settings.auto_notify_enabled == 'true' %}checked{% endif %} style="width: 1.1rem; height: 1.1rem; accent-color: var(--accent-primary);">
-            <span>Enable Automated Alerting</span>
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 500; margin-bottom: 6px;">
+            <input type="checkbox" name="auto_notify_enabled" value="true" {% if settings.auto_notify_enabled == 'true' %}checked{% endif %} style="accent-color: var(--accent);">
+            <span>Enable automated alerting</span>
           </label>
-          <p style="font-size: 0.8rem; color: var(--text-muted); margin-left: 1.7rem;">
-            When active, threats meeting the severity filter will be immediately dispatched to enabled channels upon ingestion or live log tail.
+          <p style="font-size: 12px; color: var(--text-muted); margin-left: 22px;">
+            Dispatches alerts immediately upon log ingestion or live tail detection
           </p>
         </div>
 
         <div>
-          <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; font-weight: 500;">
-            Minimum Severity Threshold (Anti-Spam)
+          <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-weight: 500;">
+            Minimum severity threshold
           </label>
-          <select name="auto_notify_min_severity" style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.6rem; font-size: 0.85rem;">
+          <select name="auto_notify_min_severity" style="width: 100%;">
             <option value="high" {% if settings.auto_notify_min_severity|default('high') == 'high' %}selected{% endif %}>
-              🛡️ High & Critical Only (Recommended — Zero Spam)
+              High and critical only (recommended)
             </option>
             <option value="critical" {% if settings.auto_notify_min_severity == 'critical' %}selected{% endif %}>
-              🔥 Critical Incidents Only (Strict Alerting)
+              Critical incidents only
             </option>
             <option value="medium" {% if settings.auto_notify_min_severity == 'medium' %}selected{% endif %}>
-              ⚠️ Medium, High & Critical
+              Medium, high, and critical
             </option>
             <option value="low" {% if settings.auto_notify_min_severity == 'low' %}selected{% endif %}>
-              ℹ️ All Findings (Low, Medium, High, Critical)
+              All findings (low, medium, high, critical)
             </option>
           </select>
-          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
-            Lower-severity routine noise and minor warnings will be recorded in the dashboard but suppressed from messaging channels.
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+            Routine warnings below this threshold are logged in the dashboard but suppressed from messaging channels
           </div>
         </div>
       </div>
 
-      <div style="border-top: 1px solid var(--border-subtle); padding-top: 1rem;">
-        <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.5rem; display: block;">
-          Active Auto-Dispatch Destinations:
+      <div style="border-top: 1px solid var(--border); padding-top: 12px;">
+        <span style="font-size: 12px; font-weight: 500; color: var(--text-secondary); margin-bottom: 8px; display: block;">
+          Active notification destinations:
         </span>
-        <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
-          <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
-            <input type="checkbox" name="auto_notify_telegram" value="true" {% if settings.auto_notify_telegram == 'true' or not settings.auto_notify_min_severity %}checked{% endif %} style="accent-color: var(--accent-primary);">
-            <span>✈️ Telegram</span>
+        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+          <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer;">
+            <input type="checkbox" name="auto_notify_telegram" value="true" {% if settings.auto_notify_telegram == 'true' or not settings.auto_notify_min_severity %}checked{% endif %} style="accent-color: var(--accent);">
+            <span>Telegram</span>
           </label>
-          <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
-            <input type="checkbox" name="auto_notify_discord" value="true" {% if settings.auto_notify_discord == 'true' or not settings.auto_notify_min_severity %}checked{% endif %} style="accent-color: var(--accent-primary);">
-            <span>💬 Discord</span>
+          <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer;">
+            <input type="checkbox" name="auto_notify_discord" value="true" {% if settings.auto_notify_discord == 'true' or not settings.auto_notify_min_severity %}checked{% endif %} style="accent-color: var(--accent);">
+            <span>Discord</span>
           </label>
-          <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer;">
-            <input type="checkbox" name="auto_notify_webhook" value="true" {% if settings.auto_notify_webhook == 'true' %}checked{% endif %} style="accent-color: var(--accent-primary);">
-            <span>🌐 SIEM Webhook</span>
+          <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer;">
+            <input type="checkbox" name="auto_notify_webhook" value="true" {% if settings.auto_notify_webhook == 'true' %}checked{% endif %} style="accent-color: var(--accent);">
+            <span>Generic webhook</span>
           </label>
         </div>
       </div>
     </div>
 
     <!-- Telegram Configuration Card -->
-    <div class="card" style="margin-bottom: 1.5rem;">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+    <div class="card">
+      <div class="card-header">
         <div>
-          <h3 style="font-size: 1.15rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
-            <span>✈️</span> Telegram Bot Alerts
-          </h3>
-          <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem;">
-            Receive mobile and desktop push notifications with incident summaries and containment actions.
-          </p>
+          <h2 class="card-title">Telegram bot</h2>
+          <p class="card-subtitle">Deliver incident notifications to a Telegram chat or channel</p>
         </div>
         <div id="telegram-test-result">
-          <button type="button" class="btn btn-secondary" style="font-size: 0.85rem;"
+          <button type="button" class="btn btn-secondary btn-sm"
                   hx-post="/api/notify/test?channel=telegram"
                   hx-include="closest form"
                   hx-target="#telegram-test-result"
@@ -115,46 +102,35 @@
         </div>
       </div>
 
-      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
         <div>
-          <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; font-weight: 500;">
-            Telegram Bot Token
+          <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-weight: 500;">
+            Bot token
           </label>
           <input type="text" name="telegram_bot_token" value="{{ settings.telegram_bot_token|default('') }}"
                  placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
-                 style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.6rem; font-family: var(--font-mono); font-size: 0.85rem;">
-          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
-            Obtain from <a href="https://t.me/BotFather" target="_blank" style="color: var(--accent-primary);">@BotFather</a>.
-          </div>
+                 style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
         </div>
-
         <div>
-          <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; font-weight: 500;">
-            Chat ID / Channel ID
+          <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-weight: 500;">
+            Chat ID
           </label>
           <input type="text" name="telegram_chat_id" value="{{ settings.telegram_chat_id|default('') }}"
-                 placeholder="123456789 or -100123456"
-                 style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.6rem; font-family: var(--font-mono); font-size: 0.85rem;">
-          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
-            Get via <a href="https://t.me/userinfobot" target="_blank" style="color: var(--accent-primary);">@userinfobot</a>.
-          </div>
+                 placeholder="-1001234567890 or @channel"
+                 style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
         </div>
       </div>
     </div>
 
     <!-- Discord Configuration Card -->
-    <div class="card" style="margin-bottom: 1.5rem;">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+    <div class="card">
+      <div class="card-header">
         <div>
-          <h3 style="font-size: 1.15rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
-            <span>💬</span> Discord Webhook Alerts
-          </h3>
-          <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem;">
-            Posts formatted rich embeds with severity color-coding directly into your Discord channel.
-          </p>
+          <h2 class="card-title">Discord webhook</h2>
+          <p class="card-subtitle">Post rich incident summaries into a Discord channel</p>
         </div>
         <div id="discord-test-result">
-          <button type="button" class="btn btn-secondary" style="font-size: 0.85rem;"
+          <button type="button" class="btn btn-secondary btn-sm"
                   hx-post="/api/notify/test?channel=discord"
                   hx-include="closest form"
                   hx-target="#discord-test-result"
@@ -165,87 +141,75 @@
       </div>
 
       <div>
-        <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; font-weight: 500;">
-          Discord Webhook URL
+        <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-weight: 500;">
+          Webhook URL
         </label>
         <input type="url" name="discord_webhook_url" value="{{ settings.discord_webhook_url|default('') }}"
-               placeholder="https://discord.com/api/webhooks/1234567890/token_string_here"
-               style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.6rem; font-family: var(--font-mono); font-size: 0.85rem;">
-        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
-          In Discord: Channel Settings &rarr; Integrations &rarr; Webhooks &rarr; New Webhook.
-        </div>
+               placeholder="https://discord.com/api/webhooks/123456789/ABCdefGh..."
+               style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
       </div>
     </div>
 
-    <!-- Generic Webhook Card -->
-    <div class="card" style="margin-bottom: 2rem;">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+    <!-- Generic Webhook / SIEM Integration Card -->
+    <div class="card">
+      <div class="card-header">
         <div>
-          <h3 style="font-size: 1.15rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
-            <span>🌐</span> Generic Webhook (SIEM / SOAR / Slack)
-          </h3>
-          <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem;">
-            Dispatches HMAC-SHA256 authenticated JSON payloads to custom endpoints, Slack, or automation runners.
-          </p>
+          <h2 class="card-title">Generic webhook / SIEM</h2>
+          <p class="card-subtitle">Dispatch JSON incident payloads to an external collector or SIEM endpoint</p>
         </div>
         <div id="webhook-test-result">
-          <button type="button" class="btn btn-secondary" style="font-size: 0.85rem;"
+          <button type="button" class="btn btn-secondary btn-sm"
                   hx-post="/api/notify/test?channel=webhook"
                   hx-include="closest form"
                   hx-target="#webhook-test-result"
                   hx-swap="innerHTML">
-            Test Webhook
+            Test webhook
           </button>
         </div>
       </div>
 
-      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;">
         <div>
-          <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; font-weight: 500;">
-            Webhook Endpoint URL
+          <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-weight: 500;">
+            Endpoint URL
           </label>
           <input type="url" name="generic_webhook_url" value="{{ settings.generic_webhook_url|default('') }}"
-                 placeholder="https://siem.mycompany.internal/api/loglens-events"
-                 style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.6rem; font-family: var(--font-mono); font-size: 0.85rem;">
+                 placeholder="https://siem.internal/api/events"
+                 style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
         </div>
         <div>
-          <label style="display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem; font-weight: 500;">
-            HMAC Secret Key (Optional)
+          <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-weight: 500;">
+            HMAC secret key (optional)
           </label>
           <input type="password" name="generic_webhook_secret" value="{{ settings.generic_webhook_secret|default('') }}"
                  placeholder="Shared secret token"
-                 style="width: 100%; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.6rem; font-family: var(--font-mono); font-size: 0.85rem;">
+                 style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
         </div>
       </div>
     </div>
 
     <!-- Save Settings Button -->
-    <div style="display: flex; justify-content: flex-end; gap: 1rem; align-items: center; margin-bottom: 2rem;">
+    <div style="display: flex; justify-content: flex-end; gap: 8px; align-items: center; margin-bottom: 24px;">
       <a href="/" class="btn btn-secondary">Cancel</a>
-      <button type="submit" class="btn btn-primary" style="padding: 0.75rem 2rem; font-size: 1rem; font-weight: 600;">
-        💾 Save Notification Settings
+      <button type="submit" class="btn btn-primary">
+        Save settings
       </button>
     </div>
   </form>
 
   <!-- Database & Storage Management Card -->
-  <div class="card" style="margin-top: 1rem; border-color: rgba(239, 68, 68, 0.3);">
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+  <div class="card" style="border-color: rgba(239, 68, 68, 0.2);">
+    <div class="card-header" style="margin-bottom: 0;">
       <div>
-        <h3 style="font-size: 1.15rem; font-weight: 600; color: #f87171; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
-          <span>🗑️</span> Database & Storage Management
-        </h3>
-        <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">
-          Purge all historical triage runs, clustered log intelligence, and security findings from local SQLite storage.
-        </p>
+        <h2 class="card-title" style="color: #f87171;">Database maintenance</h2>
+        <p class="card-subtitle">Permanently delete historical triage runs, clusters, and security findings from local storage</p>
       </div>
-      <form action="/api/runs/clear" method="post" style="margin: 0;" onsubmit="return confirm('Warning: This will permanently purge ALL stored triage runs, clusters, and security findings. Are you sure?');">
-        <button type="submit" class="btn" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); font-weight: 600; padding: 0.6rem 1.25rem;">
-          Clear All Historical Runs
+      <form action="/api/runs/clear" method="post" style="margin: 0;" onsubmit="return confirm('Permanently clear all stored runs and findings?');">
+        <button type="submit" class="btn btn-danger btn-sm">
+          Clear all runs
         </button>
       </form>
     </div>
   </div>
 </div>
 {% endblock %}
-
