@@ -392,3 +392,104 @@ def test_export_firewall_actions(tmp_path: Path) -> None:
     resp_inv = client.get(f"/runs/{run_id}/actions/invalid")
     assert resp_inv.status_code == 400
 
+
+def test_run_detail_with_errors_and_grid(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    storage = StorageManager(db_file)
+    meta = ReportMetadata(
+        generated_at=datetime.now(UTC),
+        log_source="laravel-2026-11-10.log",
+        total_lines=10,
+        parsed_events=10,
+        unparsed_lines=0,
+        total_clusters=2,
+        findings_count=0,
+    )
+    err_cluster = Cluster(
+        id="c-error-99",
+        template="SQLSTATE[HY000] [<*>] Connection refused (Host: 127.0.0.1)",
+        count=10,
+        first_seen=datetime.now(UTC),
+        last_seen=datetime.now(UTC),
+        sample_messages=["SQLSTATE[HY000] [2002] Connection refused (Host: 127.0.0.1, Port: 3306)"],
+    )
+    report = Report(metadata=meta, findings=[], clusters=[err_cluster])
+    run_id = storage.save_run(report, run_id="run-laravel-01")
+    storage.close()
+
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    resp = client.get(f"/runs/{run_id}")
+    assert resp.status_code == 200
+    assert "findings-grid" in resp.text
+    assert "Application & System Errors" in resp.text
+    assert "Database / SQL Error" in resp.text
+    assert "Explain Error with AI" in resp.text
+
+
+def test_explain_cluster_on_demand_htmx(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    storage = StorageManager(db_file)
+    meta = ReportMetadata(
+        generated_at=datetime.now(UTC),
+        log_source="laravel.log",
+        total_lines=5,
+        parsed_events=5,
+        unparsed_lines=0,
+        total_clusters=1,
+        findings_count=0,
+    )
+    cluster = Cluster(
+        id="c-error-42",
+        template="Fatal error: Call to undefined function foo()",
+        count=5,
+        first_seen=datetime.now(UTC),
+        last_seen=datetime.now(UTC),
+    )
+    report = Report(metadata=meta, findings=[], clusters=[cluster])
+    run_id = storage.save_run(report, run_id="run-err-explain")
+    storage.close()
+
+    app = create_app(db_path=db_file, provider_name="mock")
+    client = TestClient(app)
+
+    # Post HTMX explain request for cluster
+    response = client.post(f"/runs/{run_id}/clusters/c-error-42/explain")
+    assert response.status_code == 200
+    assert "AI Root Cause Diagnosis" in response.text
+    assert "Confidence:" in response.text
+
+
+def test_notify_cluster_error(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    storage = StorageManager(db_file)
+    meta = ReportMetadata(
+        generated_at=datetime.now(UTC),
+        log_source="app.log",
+        total_lines=5,
+        parsed_events=5,
+        unparsed_lines=0,
+        total_clusters=1,
+        findings_count=0,
+    )
+    cluster = Cluster(
+        id="c-net-77",
+        template="Upstream timed out (<*>) while connecting to upstream",
+        count=3,
+        first_seen=datetime.now(UTC),
+        last_seen=datetime.now(UTC),
+    )
+    report = Report(metadata=meta, findings=[], clusters=[cluster])
+    run_id = storage.save_run(report, run_id="run-net-err")
+    storage.close()
+
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    # Test notify on error cluster
+    res_tg = client.post(f"/runs/{run_id}/clusters/c-net-77/notify?channel=telegram")
+    assert res_tg.status_code == 200
+    assert "Delivery to Telegram failed" in res_tg.text or "Error" in res_tg.text
+
+

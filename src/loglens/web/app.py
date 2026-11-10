@@ -26,7 +26,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from loglens.actions.exporter import generate_action_export
-from loglens.cluster import DrainClusterer
+from loglens.cluster import DrainClusterer, extract_classified_errors
 from loglens.llm import LLMProvider, MockLLMProvider, TriageOrchestrator, get_provider
 from loglens.models import Event, Finding, LLMAssessment, Report, ReportMetadata
 from loglens.notify import DiscordNotifier, TelegramNotifier, WebhookNotifier
@@ -267,7 +267,7 @@ def create_app(
         rule_engine = RuleEngine(loaded_rules)
         findings: list[Finding] = rule_engine.evaluate(all_events, clusters)
 
-        # LLM forensic triage
+        # Optional LLM forensic triage
         triage_stats = None
         if enable_llm and clusters:
             p_inst: LLMProvider
@@ -423,12 +423,15 @@ def create_app(
         if report is None:
             raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
 
+        classified_errors = extract_classified_errors(report.clusters)
+
         return templates.TemplateResponse(
             request=request,
             name="run_detail.html",
             context={
                 "run_id": run_id,
                 "report": report,
+                "classified_errors": classified_errors,
             },
         )
 
@@ -509,6 +512,63 @@ def create_app(
                 f'<span style="color: #ef4444; font-weight: 600; font-size: 0.8rem;">Error: {html.escape(str(exc))}</span>'
             )
 
+    @app.post(
+        "/runs/{run_id}/clusters/{cluster_id}/notify",
+        response_class=HTMLResponse,
+        dependencies=[Depends(verify_token)],
+    )
+    def notify_cluster_error(
+        run_id: str,
+        cluster_id: str,
+        channel: str = "telegram",
+    ) -> HTMLResponse:
+        """Dispatch an individual error cluster alert to Telegram or Discord."""
+        report = storage.get_run(run_id)
+        if report is None:
+            raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
+
+        target_cluster = next((c for c in report.clusters if c.id == cluster_id), None)
+        if target_cluster is None:
+            raise HTTPException(status_code=404, detail=f"Cluster '{cluster_id}' not found")
+
+        settings = storage.get_all_settings()
+        notifier = resolve_notifier(channel, settings)
+        if hasattr(notifier, "cooldown"):
+            notifier.cooldown.clear()
+
+        synthetic_finding = Finding(
+            id=f"err-{cluster_id}",
+            cluster_ids=[cluster_id],
+            rule_ids=["APPLICATION-ERROR"],
+            rule_severity="high",
+            llm=LLMAssessment(
+                summary=f"Application Error Pattern #{cluster_id}: {target_cluster.template[:120]}",
+                attack_type="application_error",
+                severity="high",
+                confidence=1.0,
+                evidence=target_cluster.sample_messages[:2],
+                recommended_actions=["Review application logs and service health."],
+                false_positive_likelihood="low",
+            ),
+        )
+
+        try:
+            delivered = notifier.send_alert(synthetic_finding, report.metadata)
+            if delivered:
+                msg = f"✓ Error alert sent to {channel.capitalize()}!"
+                return HTMLResponse(
+                    f'<span style="color: #10b981; font-weight: 600; font-size: 0.8rem; border: 1px solid #10b981; padding: 0.2rem 0.4rem; border-radius: 4px; background: rgba(16, 185, 129, 0.1);">{msg}</span>'
+                )
+            else:
+                msg = f"✗ Delivery to {channel.capitalize()} failed."
+                return HTMLResponse(
+                    f'<span style="color: #ef4444; font-weight: 600; font-size: 0.8rem; border: 1px solid #ef4444; padding: 0.2rem 0.4rem; border-radius: 4px; background: rgba(239, 68, 68, 0.1);">{msg}</span>'
+                )
+        except Exception as exc:
+            return HTMLResponse(
+                f'<span style="color: #ef4444; font-weight: 600; font-size: 0.8rem;">Error: {html.escape(str(exc))}</span>'
+            )
+
     @app.get(
         "/runs/{run_id}/actions/{target}",
         response_class=PlainTextResponse,
@@ -549,17 +609,15 @@ def create_app(
         if target_finding is None:
             raise HTTPException(status_code=404, detail=f"Finding '{finding_id}' not found")
 
-        # If already assessed, return card immediately
-        if target_finding.llm is None:
-            matched_clusters = [c for c in report.clusters if c.id in target_finding.cluster_ids]
-            if not matched_clusters:
-                matched_clusters = report.clusters[:2]
+        matched_clusters = [c for c in report.clusters if c.id in target_finding.cluster_ids]
+        if not matched_clusters:
+            matched_clusters = report.clusters[:2]
 
-            triaged_findings, _ = orchestrator.triage(matched_clusters, [target_finding])
-            if triaged_findings and triaged_findings[0].llm:
-                new_assessment = triaged_findings[0].llm
-                target_finding.llm = new_assessment
-                storage.update_finding_assessment(run_id, finding_id, new_assessment)
+        triaged_findings, _ = orchestrator.triage(matched_clusters, [target_finding])
+        if triaged_findings and triaged_findings[0].llm:
+            new_assessment = triaged_findings[0].llm
+            target_finding.llm = new_assessment
+            storage.update_finding_assessment(run_id, finding_id, new_assessment)
 
         return templates.TemplateResponse(
             request=request,
@@ -569,6 +627,62 @@ def create_app(
                 "finding": target_finding,
             },
         )
+
+    @app.post(
+        "/runs/{run_id}/clusters/{cluster_id}/explain",
+        response_class=HTMLResponse,
+        dependencies=[Depends(verify_token)],
+    )
+    def explain_cluster_on_demand(
+        request: Request,
+        run_id: str,
+        cluster_id: str,
+    ) -> HTMLResponse:
+        """HTMX endpoint to trigger on-demand AI root cause diagnosis for an application error cluster."""
+        report = storage.get_run(run_id)
+        if report is None:
+            raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
+
+        target_cluster = next((c for c in report.clusters if c.id == cluster_id), None)
+        if target_cluster is None:
+            raise HTTPException(status_code=404, detail=f"Cluster '{cluster_id}' not found")
+
+        synthetic_finding = Finding(
+            id=f"explain-{cluster_id}",
+            cluster_ids=[cluster_id],
+            rule_ids=[],
+            rule_severity="medium",
+        )
+        triaged_findings, _ = orchestrator.triage([target_cluster], [synthetic_finding])
+        assessment = triaged_findings[0].llm if triaged_findings else None
+
+        if assessment:
+            actions_html = ""
+            if assessment.recommended_actions:
+                items = "".join(f"<li>{html.escape(a)}</li>" for a in assessment.recommended_actions[:2])
+                actions_html = (
+                    f'<div style="margin-top: 0.4rem;">'
+                    f'<div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">'
+                    f'Fix / Remediation'
+                    f'</div>'
+                    f'<ul style="padding-left: 1.1rem; font-size: 0.8rem; color: #6ee7b7; margin: 0;">{items}</ul>'
+                    f'</div>'
+                )
+
+            html_content = (
+                f'<div style="background: var(--bg-card); border-radius: 6px; padding: 0.85rem; border: 1px solid var(--border-subtle);">'
+                f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">'
+                f'<div style="font-weight: 600; font-size: 0.85rem; color: var(--text-main);">AI Root Cause Diagnosis</div>'
+                f'<span class="badge badge-info" style="font-size: 0.7rem;">Confidence: {int(assessment.confidence * 100)}%</span>'
+                f'</div>'
+                f'<p style="font-size: 0.85rem; line-height: 1.4; color: var(--text-main); margin: 0 0 0.4rem 0;">{html.escape(assessment.summary)}</p>'
+                f'{actions_html}'
+                f'</div>'
+            )
+        else:
+            html_content = '<div style="color: var(--text-muted); font-size: 0.8rem;">Diagnosis not available.</div>'
+
+        return HTMLResponse(content=html_content)
 
     @app.get("/api/stats", dependencies=[Depends(verify_token)])
     def api_stats() -> dict[str, Any]:

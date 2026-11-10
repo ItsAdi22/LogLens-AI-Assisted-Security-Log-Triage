@@ -7,6 +7,7 @@ from loglens.parsers.docker_json import DockerJsonParser
 from loglens.parsers.fail2ban import Fail2banParser
 from loglens.parsers.generic import GenericParser
 from loglens.parsers.json_lines import JsonLinesParser
+from loglens.parsers.laravel import LaravelParser
 from loglens.parsers.minecraft import MinecraftParser
 from loglens.parsers.pterodactyl import PterodactylParser
 from loglens.parsers.syslog import SyslogParser
@@ -21,6 +22,7 @@ registry.register(JsonLinesParser())
 registry.register(Fail2banParser())
 registry.register(UfwParser())
 registry.register(DatabaseAuthParser())
+registry.register(LaravelParser())
 registry.register(MinecraftParser())
 registry.register(PterodactylParser())
 registry.register(DockerJsonParser())
@@ -33,6 +35,7 @@ __all__ = [
     "Fail2banParser",
     "GenericParser",
     "JsonLinesParser",
+    "LaravelParser",
     "MinecraftParser",
     "Parser",
     "ParserRegistry",

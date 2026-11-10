@@ -6,6 +6,7 @@ from loglens.parsers import (
     DatabaseAuthParser,
     DockerJsonParser,
     Fail2banParser,
+    LaravelParser,
     MinecraftParser,
     PterodactylParser,
     UfwParser,
@@ -149,3 +150,40 @@ def test_docker_json_parser() -> None:
     assert ev.severity_hint == "error"
     assert ev.fields["stream"] == "stderr"
     assert "Out of memory crash" in ev.message
+
+
+def test_laravel_parser() -> None:
+    parser = LaravelParser()
+    sample = [
+        "[2026-11-10 04:42:49] local.ERROR: SQLSTATE[HY000] [2002] Connection refused (Connection: mysql, Host: 127.0.0.1, Port: 3306)",
+        "[2026-11-10 04:42:50] production.CRITICAL: Uncaught Exception: Fatal crash at line 42",
+        "[2026-11-10 04:42:51] local.WARNING: Deprecated method called from 198.51.100.14",
+    ]
+    assert parser.matches_sample(sample) > 0.5
+
+    # ERROR
+    ev_err = parser.parse_line(sample[0], 1)
+    assert ev_err is not None
+    assert ev_err.source == "laravel"
+    assert ev_err.severity_hint == "error"
+    assert ev_err.fields["environment"] == "local"
+    assert ev_err.fields["level"] == "error"
+    assert ev_err.fields["ip"] == "127.0.0.1"
+
+    # CRITICAL
+    ev_crit = parser.parse_line(sample[1], 2)
+    assert ev_crit is not None
+    assert ev_crit.severity_hint == "critical"
+    assert ev_crit.fields["environment"] == "production"
+
+    # WARNING
+    ev_warn = parser.parse_line(sample[2], 3)
+    assert ev_warn is not None
+    assert ev_warn.severity_hint == "warning"
+    assert ev_warn.fields["ip"] == "198.51.100.14"
+
+    # Stacktrace continuation line
+    ev_trace = parser.parse_line("#0 /var/www/html/app/Http/Controllers/UserController.php(42)", 4)
+    assert ev_trace is not None
+    assert ev_trace.fields["stacktrace"] is True
+

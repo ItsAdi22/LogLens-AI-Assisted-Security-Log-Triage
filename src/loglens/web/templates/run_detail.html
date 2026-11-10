@@ -57,23 +57,97 @@
       {{ report.findings|length }}
     </div>
   </div>
+  <div class="metric-box">
+    <div class="metric-label">Application Errors</div>
+    <div class="metric-value" style="color: {% if classified_errors|length > 0 %}#fb923c{% else %}var(--text-main){% endif %};">
+      {{ classified_errors|length }}
+    </div>
+  </div>
 </div>
 
-<!-- Findings Section -->
+<!-- Security Findings Section -->
 <div style="margin-bottom: 2.5rem;">
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-    <h2 style="font-size: 1.25rem; font-weight: 600;">Security Findings & Detections</h2>
-    <span style="color: var(--text-muted); font-size: 0.85rem;">{{ report.findings|length }} detected</span>
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.75rem;">
+    <div>
+      <h2 style="font-size: 1.25rem; font-weight: 600;">Security Findings & Detections</h2>
+      <div style="color: var(--text-muted); font-size: 0.85rem;">{{ report.findings|length }} detections requiring review</div>
+    </div>
+
+    <!-- Layout & View Mode Controls -->
+    {% if report.findings %}
+      <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <button type="button" class="btn btn-secondary" id="btn-toggle-findings-layout" onclick="toggleFindingsLayout()" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">
+          ☰ List View
+        </button>
+      </div>
+    {% endif %}
   </div>
 
   {% if report.findings %}
-    {% for finding in report.findings %}
-      {% include "partials/finding_card.html" %}
-    {% endfor %}
+    <!-- Filter Chips Bar -->
+    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+      <button type="button" class="filter-chip active" onclick="filterFindings('all', this)">All ({{ report.findings|length }})</button>
+      <button type="button" class="filter-chip" onclick="filterFindings('critical', this)">🔴 Critical</button>
+      <button type="button" class="filter-chip" onclick="filterFindings('high', this)">🟠 High</button>
+      <button type="button" class="filter-chip" onclick="filterFindings('medium', this)">🟡 Medium</button>
+      <button type="button" class="filter-chip" onclick="filterFindings('low', this)">🔵 Low</button>
+    </div>
+
+    <!-- Responsive Grid of Findings -->
+    <div id="findings-container" class="findings-grid">
+      {% for finding in report.findings %}
+        {% include "partials/finding_card.html" %}
+      {% endfor %}
+    </div>
   {% else %}
     <div class="card" style="text-align: center; color: var(--text-muted); padding: 2rem;">
       <p style="color: #6ee7b7; font-weight: 600; font-size: 1.05rem;">No Security Findings Detected</p>
-      <p style="font-size: 0.85rem; margin-top: 0.25rem;">This log file matched no attack signatures and exhibited no anomalous cluster spikes.</p>
+      <p style="font-size: 0.85rem; margin-top: 0.25rem;">This log file matched no attack signatures or unauthorized intrusion attempts.</p>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Application & System Errors Section -->
+<div style="margin-bottom: 2.5rem;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.75rem;">
+    <div>
+      <h2 style="font-size: 1.25rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
+        <span>⚠️</span> Application & System Errors
+      </h2>
+      <div style="color: var(--text-muted); font-size: 0.85rem;">
+        Mined exceptions, database failures, and service errors classified from log stream
+      </div>
+    </div>
+
+    {% if classified_errors %}
+      <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <button type="button" class="btn btn-secondary" id="btn-toggle-errors-layout" onclick="toggleErrorsLayout()" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">
+          ☰ List View
+        </button>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if classified_errors %}
+    <!-- Filter Chips for Errors -->
+    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+      <button type="button" class="filter-chip active" onclick="filterErrors('all', this)">All Errors ({{ classified_errors|length }})</button>
+      <button type="button" class="filter-chip" onclick="filterErrors('critical', this)">🔴 Critical / Exceptions</button>
+      <button type="button" class="filter-chip" onclick="filterErrors('high', this)">🟠 High</button>
+      <button type="button" class="filter-chip" onclick="filterErrors('medium', this)">🟡 Medium</button>
+      <button type="button" class="filter-chip" onclick="filterErrors('low', this)">🔵 Warnings</button>
+    </div>
+
+    <!-- Responsive Grid of Classified Errors -->
+    <div id="errors-container" class="findings-grid">
+      {% for error in classified_errors %}
+        {% include "partials/error_card.html" %}
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card" style="text-align: center; color: var(--text-muted); padding: 1.75rem;">
+      <p style="color: #6ee7b7; font-weight: 600; font-size: 1rem;">No Application Errors Detected</p>
+      <p style="font-size: 0.85rem; margin-top: 0.25rem;">No fatal exceptions, database connection failures, or service crashes found.</p>
     </div>
   {% endif %}
 </div>
@@ -212,6 +286,70 @@
       const fb = document.getElementById('copy-feedback');
       fb.textContent = '✓ Copied to clipboard!';
       setTimeout(() => { fb.textContent = ''; }, 3000);
+    });
+  }
+
+  // Findings Grid / List layout toggle
+  function toggleFindingsLayout() {
+    const container = document.getElementById('findings-container');
+    const btn = document.getElementById('btn-toggle-findings-layout');
+    if (!container || !btn) return;
+
+    if (container.classList.contains('list-view')) {
+      container.classList.remove('list-view');
+      btn.textContent = '☰ List View';
+    } else {
+      container.classList.add('list-view');
+      btn.textContent = '⊞ Grid View';
+    }
+  }
+
+  // Errors Grid / List layout toggle
+  function toggleErrorsLayout() {
+    const container = document.getElementById('errors-container');
+    const btn = document.getElementById('btn-toggle-errors-layout');
+    if (!container || !btn) return;
+
+    if (container.classList.contains('list-view')) {
+      container.classList.remove('list-view');
+      btn.textContent = '☰ List View';
+    } else {
+      container.classList.add('list-view');
+      btn.textContent = '⊞ Grid View';
+    }
+  }
+
+  // Filter Findings by Severity
+  function filterFindings(sev, btnElement) {
+    const parent = btnElement.parentElement;
+    parent.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    btnElement.classList.add('active');
+
+    const cards = document.querySelectorAll('.finding-card-item');
+    cards.forEach(card => {
+      const cardSev = card.getAttribute('data-severity');
+      if (sev === 'all' || cardSev === sev) {
+        card.style.display = 'flex';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  }
+
+  // Filter Errors by Severity
+  function filterErrors(sev, btnElement) {
+    const parent = btnElement.parentElement;
+    parent.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    btnElement.classList.add('active');
+
+    const cards = document.querySelectorAll('.error-card-item');
+    cards.forEach(card => {
+      const cardSev = card.getAttribute('data-severity');
+      if (sev === 'all' || cardSev === sev) {
+        card.style.display = 'flex';
+      } else {
+        card.style.display = 'none';
+      }
     });
   }
 </script>

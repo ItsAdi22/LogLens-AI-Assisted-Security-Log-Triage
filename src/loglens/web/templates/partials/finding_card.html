@@ -1,105 +1,115 @@
-<div class="card" style="border-left: 4px solid {% if finding.rule_severity == 'critical' %}#ef4444{% elif finding.rule_severity == 'high' %}#f97316{% elif finding.rule_severity == 'medium' %}#eab308{% elif finding.rule_severity == 'low' %}#3b82f6{% else %}#64748b{% endif %};">
-  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
-    <div>
-      <span class="badge badge-{{ finding.rule_severity|lower }}">{{ finding.rule_severity }}</span>
-      <span style="font-weight: 700; margin-left: 0.5rem; font-size: 1.05rem;">
-        {% if finding.llm and finding.llm.attack_type %}
-          {{ finding.llm.attack_type|replace('_', ' ')|title }}
-        {% else %}
-          Security Incident ({{ finding.rule_ids|join(', ') }})
-        {% endif %}
-      </span>
-      <span style="color: var(--text-muted); font-size: 0.8rem; font-family: var(--font-mono); margin-left: 0.5rem;">
-        [{{ finding.id }}]
-      </span>
-    </div>
-    <div>
-      {% for rid in finding.rule_ids %}
-        <span class="code" style="color: var(--accent-primary); font-size: 0.8rem;">{{ rid }}</span>
-      {% endfor %}
-    </div>
-  </div>
-
-  <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
-    Associated Clusters:
-    {% for cid in finding.cluster_ids %}
-      <a href="#cluster-{{ cid }}" style="color: var(--accent-primary); text-decoration: none; font-family: var(--font-mono); margin-right: 0.4rem;">
-        #{{ cid }}
-      </a>
-    {% endfor %}
-  </div>
-
-  <div id="finding-{{ finding.id }}-assessment">
-    {% if finding.llm %}
-      <div style="background: var(--bg-card); border-radius: 6px; padding: 1rem; border: 1px solid var(--border-subtle);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-          <div style="font-weight: 600; font-size: 0.9rem; color: var(--text-main);">AI Threat Assessment</div>
-          <div style="font-size: 0.8rem; color: var(--text-muted);">
-            Confidence: <strong style="color: var(--accent-primary);">{{ (finding.llm.confidence * 100)|round|int }}%</strong>
-            &bull; False Positive Likelihood: <strong style="text-transform: capitalize;">{{ finding.llm.false_positive_likelihood }}</strong>
-          </div>
-        </div>
-
-        <p style="font-size: 0.9rem; line-height: 1.4; margin-bottom: 0.75rem; color: var(--text-main);">
-          {{ finding.llm.summary }}
-        </p>
-
-        {% if finding.llm.evidence %}
-          <div style="margin-bottom: 0.5rem;">
-            <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin-bottom: 0.25rem;">
-              Corroborating Evidence
-            </div>
-            <ul style="padding-left: 1.25rem; font-size: 0.85rem; color: var(--text-muted);">
-              {% for ev in finding.llm.evidence %}
-                <li>{{ ev }}</li>
-              {% endfor %}
-            </ul>
-          </div>
-        {% endif %}
-
-        {% if finding.llm.recommended_actions %}
-          <div>
-            <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin-bottom: 0.25rem;">
-              Recommended Remediation Steps
-            </div>
-            <ul style="padding-left: 1.25rem; font-size: 0.85rem; color: #6ee7b7;">
-              {% for act in finding.llm.recommended_actions %}
-                <li>{{ act }}</li>
-              {% endfor %}
-            </ul>
-          </div>
-        {% endif %}
+<div id="finding-{{ finding.id }}-card" class="card finding-card-item" data-severity="{{ finding.rule_severity|lower }}" style="display: flex; flex-direction: column; justify-content: space-between; border-left: 4px solid {% if finding.rule_severity == 'critical' %}#ef4444{% elif finding.rule_severity == 'high' %}#f97316{% elif finding.rule_severity == 'medium' %}#eab308{% elif finding.rule_severity == 'low' %}#3b82f6{% else %}#64748b{% endif %}; margin-bottom: 0;">
+  <div>
+    <!-- Card Header -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; gap: 0.5rem;">
+      <div style="flex: 1;">
+        <span class="badge badge-{{ finding.rule_severity|lower }}">{{ finding.rule_severity }}</span>
+        <span style="font-weight: 700; margin-left: 0.5rem; font-size: 1rem; color: var(--text-main);">
+          {% if finding.llm and finding.llm.attack_type %}
+            {{ finding.llm.attack_type|replace('_', ' ')|title }}
+          {% elif finding.rule_ids %}
+            {{ finding.rule_ids|join(', ') }}
+          {% else %}
+            Security Anomaly
+          {% endif %}
+        </span>
+        <span style="color: var(--text-muted); font-size: 0.75rem; font-family: var(--font-mono); margin-left: 0.35rem;">
+          [{{ finding.id }}]
+        </span>
       </div>
-    {% else %}
-      <div style="background: rgba(30, 41, 59, 0.4); border-radius: 6px; padding: 1rem; border: 1px dashed var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
-        <div style="color: var(--text-muted); font-size: 0.85rem;">
-          Rule-based detection. AI forensic assessment has not yet been computed for this finding.
-        </div>
-        <form hx-post="/runs/{{ run_id }}/findings/{{ finding.id }}/explain" hx-target="#finding-{{ finding.id }}-assessment" hx-swap="outerHTML">
-          <button type="submit" class="btn" style="font-size: 0.8rem;">
-            <span class="htmx-indicator spinner" id="finding-{{ finding.id }}-spinner"></span>
-            Explain with AI
+
+      <!-- Quick AI Re-analyze Button if already triaged -->
+      {% if finding.llm %}
+        <form hx-post="/runs/{{ run_id }}/findings/{{ finding.id }}/explain" hx-target="#finding-{{ finding.id }}-card" hx-swap="outerHTML" style="margin: 0;">
+          <button type="submit" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; display: inline-flex; align-items: center; gap: 0.3rem;" title="Re-run AI forensic assessment">
+            <span>🔄 Re-analyze</span>
           </button>
         </form>
-      </div>
-    {% endif %}
+      {% endif %}
+    </div>
+
+    <!-- Cluster Links -->
+    <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+      Clusters:
+      {% for cid in finding.cluster_ids %}
+        <a href="#cluster-{{ cid }}" style="color: var(--accent-primary); text-decoration: none; font-family: var(--font-mono); margin-right: 0.35rem;">
+          #{{ cid }}
+        </a>
+      {% endfor %}
+    </div>
+
+    <!-- Assessment or Explain CTA -->
+    <div id="finding-{{ finding.id }}-assessment" style="margin-bottom: 0.75rem;">
+      {% if finding.llm %}
+        <div style="background: var(--bg-card); border-radius: 6px; padding: 0.85rem; border: 1px solid var(--border-subtle);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+            <div style="font-weight: 600; font-size: 0.85rem; color: var(--text-main);">AI Threat Assessment</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">
+              Confidence: <strong style="color: var(--accent-primary);">{{ (finding.llm.confidence * 100)|round|int }}%</strong>
+              &bull; FP: <strong style="text-transform: capitalize;">{{ finding.llm.false_positive_likelihood }}</strong>
+            </div>
+          </div>
+
+          <p style="font-size: 0.85rem; line-height: 1.4; margin-bottom: 0.6rem; color: var(--text-main);">
+            {{ finding.llm.summary }}
+          </p>
+
+          {% if finding.llm.evidence %}
+            <div style="margin-bottom: 0.4rem;">
+              <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin-bottom: 0.2rem;">
+                Corroborating Evidence
+              </div>
+              <ul style="padding-left: 1.1rem; font-size: 0.8rem; color: var(--text-muted); margin: 0;">
+                {% for ev in finding.llm.evidence[:2] %}
+                  <li>{{ ev }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endif %}
+
+          {% if finding.llm.recommended_actions %}
+            <div>
+              <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin-bottom: 0.2rem;">
+                Remediation Actions
+              </div>
+              <ul style="padding-left: 1.1rem; font-size: 0.8rem; color: #6ee7b7; margin: 0;">
+                {% for act in finding.llm.recommended_actions[:2] %}
+                  <li>{{ act }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endif %}
+        </div>
+      {% else %}
+        <div style="background: rgba(30, 41, 59, 0.4); border-radius: 6px; padding: 1rem; border: 1px dashed var(--border-subtle); display: flex; justify-content: space-between; align-items: center; gap: 0.75rem;">
+          <div style="color: var(--text-muted); font-size: 0.8rem;">
+            Rule match detected. Click to run AI forensic explanation.
+          </div>
+          <form hx-post="/runs/{{ run_id }}/findings/{{ finding.id }}/explain" hx-target="#finding-{{ finding.id }}-card" hx-swap="outerHTML" style="margin: 0;">
+            <button type="submit" class="btn btn-primary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem; white-space: nowrap;">
+              ✨ Explain with AI
+            </button>
+          </form>
+        </div>
+      {% endif %}
+    </div>
   </div>
 
   <!-- Finding Alert Notification Row -->
-  <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border-subtle);">
-    <div id="finding-{{ finding.id }}-alert-status" style="font-size: 0.8rem; color: var(--text-muted);"></div>
-    <div style="display: flex; gap: 0.4rem;">
-      <button type="button" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;"
+  <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 0.6rem; border-top: 1px solid var(--border-subtle); margin-top: 0.5rem;">
+    <div id="finding-{{ finding.id }}-alert-status" style="font-size: 0.75rem; color: var(--text-muted);"></div>
+    <div style="display: flex; gap: 0.35rem;">
+      <button type="button" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;"
               hx-post="/runs/{{ run_id }}/findings/{{ finding.id }}/notify?channel=telegram"
               hx-target="#finding-{{ finding.id }}-alert-status"
               hx-swap="innerHTML">
-        ✈️ Telegram Alert
+        ✈️ Telegram
       </button>
-      <button type="button" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;"
+      <button type="button" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;"
               hx-post="/runs/{{ run_id }}/findings/{{ finding.id }}/notify?channel=discord"
               hx-target="#finding-{{ finding.id }}-alert-status"
               hx-swap="innerHTML">
-        💬 Discord Alert
+        💬 Discord
       </button>
     </div>
   </div>
