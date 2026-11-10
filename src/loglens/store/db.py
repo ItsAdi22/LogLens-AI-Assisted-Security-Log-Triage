@@ -490,6 +490,27 @@ class StorageManager:
             )
         return timeline
 
+    def delete_run(self, run_id: str) -> bool:
+        """Delete an individual run and its associated findings and clusters."""
+        with self._conn:
+            cursor = self._conn.execute("DELETE FROM runs WHERE run_id = ?", (run_id,))
+            self._conn.execute("DELETE FROM findings WHERE run_id = ?", (run_id,))
+            self._conn.execute("DELETE FROM clusters WHERE run_id = ?", (run_id,))
+            return cursor.rowcount > 0
+
+    def clear_all_runs(self) -> int:
+        """Purge all historical triage runs, findings, and clusters from SQLite storage.
+
+        Preserves user settings and schema migrations. Returns count of deleted runs.
+        """
+        with self._conn:
+            cursor = self._conn.execute("SELECT COUNT(*) FROM runs")
+            count = int(cursor.fetchone()[0])
+            self._conn.execute("DELETE FROM findings")
+            self._conn.execute("DELETE FROM clusters")
+            self._conn.execute("DELETE FROM runs")
+            return count
+
     def close(self) -> None:
         """Close SQLite database connection."""
         self._conn.close()

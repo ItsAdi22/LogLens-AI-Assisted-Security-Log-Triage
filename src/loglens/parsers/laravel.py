@@ -94,6 +94,14 @@ class LaravelParser:
                 "level": raw_level,
             }
 
+            # If message contains an embedded JSON exception context, extract the clean headline
+            if ' {"exception":' in msg_body:
+                headline, _, exc_suffix = msg_body.partition(' {"exception":')
+                clean_msg = headline.strip()
+                fields["exception_context"] = '{"exception":' + exc_suffix
+            else:
+                clean_msg = msg_body
+
             # Extract IP if present in the message
             ip_m = IP_REGEX.search(msg_body)
             if ip_m:
@@ -104,12 +112,12 @@ class LaravelParser:
                 source="laravel",
                 host=None,
                 severity_hint=severity_hint,
-                message=msg_body,
+                message=clean_msg,
                 fields=fields,
                 raw_hash=compute_raw_hash(raw_line),
             )
 
-        # Handle stack trace or continuation lines
+        # Handle standalone stack trace or continuation lines if not pre-grouped
         if line.startswith("#") or line.startswith("[stacktrace]") or line.startswith("at "):
             ts = reference_dt or datetime.now(UTC)
             return Event(

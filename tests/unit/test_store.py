@@ -189,3 +189,28 @@ def test_storage_settings() -> None:
     assert all_settings["discord_webhook_url"] == "https://discord.com/webhook"
 
     storage.close()
+
+
+def test_storage_delete_run_and_clear_all() -> None:
+    storage = StorageManager(db_path=":memory:")
+    rep1 = create_test_report()
+    rep2 = create_test_report()
+    run1 = storage.save_run(rep1, run_id="run-del-01")
+    run2 = storage.save_run(rep2, run_id="run-del-02")
+
+    assert storage.get_run(run1) is not None
+    assert storage.get_run(run2) is not None
+
+    # Delete single run
+    assert storage.delete_run(run1) is True
+    assert storage.get_run(run1) is None
+    assert storage.get_run(run2) is not None
+    assert storage.delete_run("nonexistent-run") is False
+
+    # Clear all runs
+    cleared = storage.clear_all_runs()
+    assert cleared == 1
+    assert storage.get_run(run2) is None
+    assert storage.get_global_stats()["total_runs"] == 0
+
+    storage.close()

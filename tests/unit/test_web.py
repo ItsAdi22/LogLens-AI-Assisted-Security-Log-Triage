@@ -269,9 +269,7 @@ def test_analyze_submit_uploaded_file(tmp_path: Path) -> None:
     app = create_app(db_path=db_file)
     client = TestClient(app)
 
-    log_snippet = (
-        "Nov 10 12:00:01 server sshd[1024]: Accepted publickey for user admin from 198.51.100.22 port 51234 ssh2\n"
-    )
+    log_snippet = "Nov 10 12:00:01 server sshd[1024]: Accepted publickey for user admin from 198.51.100.22 port 51234 ssh2\n"
 
     response = client.post(
         "/analyze",
@@ -493,3 +491,60 @@ def test_notify_cluster_error(tmp_path: Path) -> None:
     assert "Delivery to Telegram failed" in res_tg.text or "Error" in res_tg.text
 
 
+def test_delete_run_and_clear_all_runs_endpoints(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    storage = StorageManager(db_file)
+    meta = ReportMetadata(
+        generated_at=datetime.now(UTC),
+        log_source="app.log",
+        total_lines=5,
+        parsed_events=5,
+        unparsed_lines=0,
+        total_clusters=1,
+        findings_count=0,
+    )
+    rep1 = Report(metadata=meta, findings=[], clusters=[])
+    rep2 = Report(metadata=meta, findings=[], clusters=[])
+    run1 = storage.save_run(rep1, run_id="run-web-del-1")
+    run2 = storage.save_run(rep2, run_id="run-web-del-2")
+    storage.close()
+
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    # 1. Delete single run via standard POST
+    res_del = client.post(f"/runs/{run1}/delete", follow_redirects=False)
+    assert res_del.status_code == 303
+    assert res_del.headers["location"] == "/"
+
+    # Verify run1 gone, run2 exists
+    res_get1 = client.get(f"/runs/{run1}")
+    assert res_get1.status_code == 404
+    res_get2 = client.get(f"/runs/{run2}")
+    assert res_get2.status_code == 200
+
+    # 2. Delete with HTMX header
+    res_htmx = client.post(f"/runs/{run2}/delete", headers={"HX-Request": "true"})
+    assert res_htmx.status_code == 200
+    assert res_htmx.headers.get("HX-Redirect") == "/"
+
+    # Re-add runs to test clear all
+    storage = StorageManager(db_file)
+    storage.save_run(rep1, run_id="run-web-del-3")
+    storage.save_run(rep2, run_id="run-web-del-4")
+    storage.close()
+
+    # 3. Clear all runs via standard POST
+    res_clear = client.post("/api/runs/clear", follow_redirects=False)
+    assert res_clear.status_code == 303
+    assert res_clear.headers["location"] == "/"
+
+    # 4. Clear all runs via HTMX
+    res_clear_htmx = client.post("/api/runs/clear", headers={"HX-Request": "true"})
+    assert res_clear_htmx.status_code == 200
+    assert res_clear_htmx.headers.get("HX-Redirect") == "/"
+
+    # Verify table empty
+    res_dash = client.get("/")
+    assert res_dash.status_code == 200
+    assert "No triage runs recorded yet." in res_dash.text

@@ -186,4 +186,3 @@ def test_laravel_parser() -> None:
     ev_trace = parser.parse_line("#0 /var/www/html/app/Http/Controllers/UserController.php(42)", 4)
     assert ev_trace is not None
     assert ev_trace.fields["stacktrace"] is True
-

@@ -34,7 +34,9 @@ class ClassifiedError(BaseModel):
 
 
 # Heuristic patterns for identifying application errors, database failures, and exceptions
-ERROR_PATTERNS: list[tuple[re.Pattern[str], str, str, Literal["critical", "high", "medium", "low"]]] = [
+ERROR_PATTERNS: list[
+    tuple[re.Pattern[str], str, str, Literal["critical", "high", "medium", "low"]]
+] = [
     (
         re.compile(
             r"\b(sqlstate|mysql|postgresql|postgres|deadlock|database\s+error|query\s+failed|"
@@ -47,17 +49,8 @@ ERROR_PATTERNS: list[tuple[re.Pattern[str], str, str, Literal["critical", "high"
     ),
     (
         re.compile(
-            r"\b(uncaught\s+exception|fatal\s+error|unhandled|nullpointer|typeerror|referenceerror|"
-            r"segmentation\s+fault|panic|traceback|exception|error\s+while\s+evaluating)\b",
-            re.IGNORECASE,
-        ),
-        "application_exception",
-        "Application Exception",
-        "critical",
-    ),
-    (
-        re.compile(
-            r"\b(connection\s+(?:refused|timed\s*out|reset)|etimedout|econnrefused|econnreset|"
+            r"\b(curl\s+error|resolving\s+timed\s*out|connection\s+(?:refused|timed\s*out|reset)|"
+            r"dns\s+(?:error|timeout|failure)|etimedout|econnrefused|econnreset|"
             r"broken\s+pipe|upstream\s+timed\s*out|502\s+bad\s+gateway|504\s+gateway|"
             r"500\s+internal\s+server)\b",
             re.IGNORECASE,
@@ -65,6 +58,16 @@ ERROR_PATTERNS: list[tuple[re.Pattern[str], str, str, Literal["critical", "high"
         "network_failure",
         "Network / Service Outage",
         "high",
+    ),
+    (
+        re.compile(
+            r"\b(uncaught\s+exception|fatal\s+error|unhandled|nullpointer|typeerror|referenceerror|"
+            r"segmentation\s+fault|panic|traceback|exception|error\s+while\s+evaluating)\b",
+            re.IGNORECASE,
+        ),
+        "application_exception",
+        "Application Exception",
+        "critical",
     ),
     (
         re.compile(
@@ -87,7 +90,7 @@ ERROR_PATTERNS: list[tuple[re.Pattern[str], str, str, Literal["critical", "high"
     ),
     (
         re.compile(
-            r"\b(error|failed\s+to|failure|critical)\b",
+            r"\b(error|failed|failure|crash|fatal|critical|exit\s+code)\b",
             re.IGNORECASE,
         ),
         "general_error",

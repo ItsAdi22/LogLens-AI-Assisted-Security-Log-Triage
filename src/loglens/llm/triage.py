@@ -100,16 +100,10 @@ class TriageOrchestrator:
             triaged_cluster_ids.add(cluster.id)
             c_findings = findings_by_cluster.get(cluster.id, [])
             all_rule_ids: list[str] = []
-            highest_sev: str = "info"
 
             if c_findings:
                 for f in c_findings:
                     all_rule_ids.extend(f.rule_ids)
-                # Compute highest severity
-                highest_sev = max(
-                    (f.rule_severity for f in c_findings),
-                    key=lambda s: SEVERITY_RANKS.get(s, 1),
-                )
 
             # Check for adversarial injection phrases in cluster messages or template
             raw_text_sample = " ".join(cluster.sample_messages)
@@ -225,17 +219,24 @@ class TriageOrchestrator:
                         )
                     )
             else:
-                # If there was no initial rule finding but LLM identified a threat or cluster was evaluated
-                effective_sev = restored_assessment.severity if restored_assessment else highest_sev
-                enriched_findings.append(
-                    Finding(
-                        id=f"finding-{cluster.id}",
-                        cluster_ids=[cluster.id],
-                        rule_ids=[],
-                        rule_severity=effective_sev,  # type: ignore[arg-type]
-                        llm=restored_assessment,
+                # If there was no initial rule finding, only surface a finding if LLM identified a real threat
+                if (
+                    restored_assessment
+                    and restored_assessment.attack_type
+                    and restored_assessment.attack_type.lower()
+                    not in ("none", "benign", "info", "normal")
+                    and restored_assessment.severity in ("critical", "high", "medium")
+                    and restored_assessment.false_positive_likelihood != "high"
+                ):
+                    enriched_findings.append(
+                        Finding(
+                            id=f"finding-{cluster.id}",
+                            cluster_ids=[cluster.id],
+                            rule_ids=[],
+                            rule_severity=restored_assessment.severity,
+                            llm=restored_assessment,
+                        )
                     )
-                )
 
             stats["triaged_clusters"] += 1
 

@@ -39,7 +39,9 @@ def main() -> None:
             break
 
     parser = registry.autodetect(sample_lines)
-    console.print(f"   [green]✓[/green] Auto-detected format: [bold cyan]{parser.name}[/bold cyan] ({parser.description})")
+    console.print(
+        f"   [green]✓[/green] Auto-detected format: [bold cyan]{parser.name}[/bold cyan] ({parser.description})"
+    )
 
     # Parse and cluster
     console.print("\n[bold]2. Mining Signature Templates with Drain3 Clustering:[/bold]")
@@ -69,9 +71,13 @@ def main() -> None:
     console.print("\n[bold]3. Evaluating Deterministic MITRE ATT&CK Rules:[/bold]")
     engine = RuleEngine(get_builtin_rules())
     findings = engine.evaluate(events, clusters)
-    console.print(f"   [green]✓[/green] Triggered [bold red]{len(findings)}[/bold red] security findings.")
+    console.print(
+        f"   [green]✓[/green] Triggered [bold red]{len(findings)}[/bold red] security findings."
+    )
 
-    finding_table = Table(title="Detected Security Incidents", show_header=True, header_style="bold red")
+    finding_table = Table(
+        title="Detected Security Incidents", show_header=True, header_style="bold red"
+    )
     finding_table.add_column("Severity", width=10)
     finding_table.add_column("Title", style="bold")
     finding_table.add_column("MITRE Technique", style="yellow")
@@ -80,7 +86,12 @@ def main() -> None:
     for f in findings:
         color = "red" if f.rule_severity in ("high", "critical") else "yellow"
         rules_matched = ", ".join(f.rule_ids) if f.rule_ids else "heuristic"
-        finding_table.add_row(f"[{color}]{f.rule_severity.upper()}[/{color}]", f.id[:8], rules_matched, ", ".join(f.cluster_ids))
+        finding_table.add_row(
+            f"[{color}]{f.rule_severity.upper()}[/{color}]",
+            f.id[:8],
+            rules_matched,
+            ", ".join(f.cluster_ids),
+        )
     console.print(finding_table)
 
     # Reversible redaction
@@ -113,7 +124,9 @@ def main() -> None:
     t0 = time.perf_counter()
     triaged_findings, _triage_stats = orchestrator.triage(clusters, findings=findings)
     elapsed = time.perf_counter() - t0
-    console.print(f"   [green]✓[/green] Completed AI assessment across findings in [bold]{elapsed:.3f}s[/bold].")
+    console.print(
+        f"   [green]✓[/green] Completed AI assessment across findings in [bold]{elapsed:.3f}s[/bold]."
+    )
 
     llm_findings = [f for f in triaged_findings if f.llm is not None]
     if llm_findings and llm_findings[0].llm:
@@ -148,7 +161,9 @@ def main() -> None:
     report = Report(metadata=meta, findings=triaged_findings, clusters=clusters)
     html_content = generate_html_report(report)
     report_out.write_text(html_content, encoding="utf-8")
-    console.print(f"\n[bold green]✓ Walkthrough complete![/bold green] Generated report at: [bold]{report_out.resolve()}[/bold]\n")
+    console.print(
+        f"\n[bold green]✓ Walkthrough complete![/bold green] Generated report at: [bold]{report_out.resolve()}[/bold]\n"
+    )
 
 
 if __name__ == "__main__":

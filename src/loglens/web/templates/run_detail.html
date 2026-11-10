@@ -32,6 +32,11 @@
         🛡️ Firewall Drop Rules
       </button>
       <a href="/api/runs/{{ run_id }}" class="btn btn-secondary" style="font-size: 0.85rem;" target="_blank">Export JSON</a>
+      <form action="/runs/{{ run_id }}/delete" method="post" style="display: inline; margin: 0;" onsubmit="return confirm('Are you sure you want to delete this triage run ({{ run_id }})?');">
+        <button type="submit" class="btn" style="font-size: 0.85rem; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);">
+          🗑️ Delete Run
+        </button>
+      </form>
     </div>
   </div>
   <div id="run-alert-status" style="margin-top: 0.75rem;"></div>

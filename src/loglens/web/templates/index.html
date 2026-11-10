@@ -8,10 +8,17 @@
     <h1 style="font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em;">Security Triage Operations</h1>
     <p style="color: var(--text-muted); font-size: 0.95rem;">Historical runs, clustered log intelligence, and automated threat detections.</p>
   </div>
-  <div style="display: flex; gap: 0.75rem; align-items: center;">
+  <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
     <a href="/analyze" class="btn btn-primary" style="font-weight: 600;">+ New Analysis</a>
-    <a href="/settings" class="btn btn-secondary">🔔 Alerts</a>
+    <a href="/settings" class="btn btn-secondary">🔔 Alerts & Settings</a>
     <a href="/api/runs" class="btn btn-secondary" target="_blank">Export JSON</a>
+    {% if runs %}
+      <form action="/api/runs/clear" method="post" style="display: inline; margin: 0;" onsubmit="return confirm('Are you sure you want to clear all triage runs and security findings? This action cannot be undone.');">
+        <button type="submit" class="btn" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); font-weight: 500;">
+          🗑️ Clear All Runs
+        </button>
+      </form>
+    {% endif %}
   </div>
 </div>
 
@@ -124,9 +131,16 @@
               {% endif %}
             </td>
             <td>
-              <a href="/runs/{{ run.run_id }}" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;">
-                Inspect
-              </a>
+              <div style="display: flex; gap: 0.4rem; align-items: center;">
+                <a href="/runs/{{ run.run_id }}" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;">
+                  Inspect
+                </a>
+                <form action="/runs/{{ run.run_id }}/delete" method="post" style="display: inline; margin: 0;" onsubmit="return confirm('Delete run {{ run.run_id }}?');">
+                  <button type="submit" class="btn" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25);" title="Delete this run">
+                    🗑️
+                  </button>
+                </form>
+              </div>
             </td>
           </tr>
         {% endfor %}
