@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from loglens.models import Finding
 from loglens.notify.base import MockNotifier
 from loglens.parsers.auth_log import AuthLogParser
@@ -92,3 +94,38 @@ def test_live_watch_manager_lifecycle(tmp_path: Path) -> None:
     # 5. Stop all
     manager.stop_all()
     storage.close()
+
+
+def test_live_ssh_monitor_clean_stop(monkeypatch: pytest.MonkeyPatch) -> None:
+    from unittest.mock import MagicMock
+
+    import paramiko
+
+    from loglens.watch import LiveSSHMonitor
+
+    mock_channel = MagicMock()
+    mock_channel.recv.return_value = b""
+    mock_channel.exit_status_ready.return_value = True
+    mock_channel.recv_exit_status.return_value = -1
+
+    mock_stdout = MagicMock()
+    mock_stdout.channel = mock_channel
+    mock_stdin = MagicMock()
+    mock_stderr = MagicMock()
+
+    monkeypatch.setattr(paramiko.SSHClient, "connect", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        paramiko.SSHClient,
+        "exec_command",
+        lambda *args, **kwargs: (mock_stdin, mock_stdout, mock_stderr),
+    )
+
+    monitor = LiveSSHMonitor(
+        host="192.0.2.1",
+        username="root",
+        remote_cmd="tail -f /var/log/auth.log",
+        interval=0.1,
+    )
+    monitor.stop()  # User pressed stop -> _running = False
+    # run() must exit cleanly and not raise RuntimeError on exit code -1
+    monitor.run(max_iterations=1)

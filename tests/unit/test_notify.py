@@ -8,6 +8,7 @@ import pytest
 
 from loglens.models import Finding, LLMAssessment, ReportMetadata
 from loglens.notify import (
+    CompositeNotifier,
     CooldownTracker,
     DiscordNotifier,
     MockNotifier,
@@ -165,6 +166,45 @@ def test_notifier_factory() -> None:
     assert get_notifier("discord").name == "discord"
     assert get_notifier("webhook").name == "webhook"
     assert get_notifier("mock").name == "mock"
+    assert get_notifier("composite").name == "composite"
 
     with pytest.raises(ValueError, match="Unknown notifier channel"):
         get_notifier("unsupported")
+
+
+def test_composite_notifier_dispatch_and_threshold() -> None:
+    mock1 = MockNotifier(name="mock1", min_severity="info")
+    mock2 = MockNotifier(name="mock2", min_severity="info")
+
+    composite = CompositeNotifier([mock1, mock2], min_severity="high")
+    assert composite._is_configured() is True
+
+    f_low = sample_finding(severity="low")
+    f_high = sample_finding(severity="high")
+
+    # Below composite min_severity
+    assert composite.send_alert(f_low) is False
+    assert len(mock1.sent_alerts) == 0
+    assert len(mock2.sent_alerts) == 0
+
+    # Meets composite min_severity -> both notifiers receive
+    assert composite.send_alert(f_high) is True
+    assert len(mock1.sent_alerts) == 1
+    assert len(mock2.sent_alerts) == 1
+
+    # Digest
+    meta = sample_meta()
+    assert composite.send_digest([f_low, f_high], meta) is True
+    assert len(mock1.sent_digests) == 1
+    assert len(mock2.sent_digests) == 1
+
+
+def test_composite_notifier_skips_unconfigured() -> None:
+    unconf = DiscordNotifier(webhook_url="")
+    conf = MockNotifier(name="mock_conf", min_severity="info")
+
+    composite = CompositeNotifier([unconf, conf], min_severity="medium")
+    f_high = sample_finding(severity="high")
+
+    assert composite.send_alert(f_high) is True
+    assert len(conf.sent_alerts) == 1

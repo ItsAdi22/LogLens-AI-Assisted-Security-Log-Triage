@@ -53,6 +53,8 @@ python run.py
 ```
 *Automatically pre-populates sample attack telemetry, launches the dashboard on `http://127.0.0.1:8080`, and opens your default web browser.*
 
+![LogLens Security Events Triage Grid](docs/img/security_findings_grid.jpg)
+
 Other shortcuts:
 - `.\run.bat --demo` (or `python run.py --demo`): Watch an interactive terminal walkthrough.
 - `.\run.bat --test` (or `python run.py --test`): Run all unit tests, AI benchmarks, and memory profilers.

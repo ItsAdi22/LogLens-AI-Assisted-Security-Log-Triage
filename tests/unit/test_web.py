@@ -974,3 +974,43 @@ def test_run_detail_security_events_and_noise_separation(tmp_path: Path) -> None
 
     # 4. Deduped sample excerpt: since c_err sample_message == template, "Sample excerpt" should NOT appear for it
     assert "Sample excerpt" not in res.text
+
+    # 5. Open stack modal and cluster stack data JSON scripts
+    assert "Open stack" in res.text
+    assert 'id="stack-modal"' in res.text
+    assert 'id="clusters-data"' in res.text
+    assert 'id="findings-data"' in res.text
+
+
+def test_resolve_auto_notifier_multi_channel() -> None:
+    from loglens.web.app import resolve_auto_notifier
+
+    # 1. Disabled
+    assert resolve_auto_notifier({"auto_notify_enabled": "false"}) is None
+
+    # 2. Enabled with Discord only
+    settings_discord = {
+        "auto_notify_enabled": "true",
+        "auto_notify_discord": "true",
+        "auto_notify_telegram": "false",
+        "discord_webhook_url": "https://discord.com/api/webhooks/test/123",
+        "auto_notify_min_severity": "high",
+    }
+    notif = resolve_auto_notifier(settings_discord)
+    assert notif is not None
+    assert notif.name == "discord"
+
+    # 3. Enabled with Telegram + Discord -> CompositeNotifier
+    settings_multi = {
+        "auto_notify_enabled": "true",
+        "auto_notify_discord": "true",
+        "auto_notify_telegram": "true",
+        "discord_webhook_url": "https://discord.com/api/webhooks/test/123",
+        "telegram_bot_token": "token123",
+        "telegram_chat_id": "chat123",
+        "auto_notify_min_severity": "high",
+    }
+    notif_comp = resolve_auto_notifier(settings_multi)
+    assert notif_comp is not None
+    assert notif_comp.name == "composite"
+    assert len(notif_comp.notifiers) == 2

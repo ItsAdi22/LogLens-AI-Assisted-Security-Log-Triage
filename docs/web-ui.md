@@ -16,7 +16,10 @@ loglens serve
 - **Metric Cards & Severity Breakdown**: Instant visibility into total parsed events, mined cluster patterns, and active security incidents.
 - **7-Day Incident Activity Timeline**: Built-in activity trend showing event frequency and finding volume across recent ingestion runs.
 - **Drain3 Cluster Explorer**: Deep inspection of mined template signatures with variable parameters (`<*>`) highlighted.
+- **Event Stack Trace & Token Highlights**: Finding cards feature an **"Open stack"** inspector showing raw underlying log lines with syntax-highlighted attacker IPs (cyan), attack verbs and errors (red), target usernames (yellow), and port parameters (purple).
 - **On-Demand AI Explanations**: Findings detected via deterministic rules include an **"Explain with AI"** HTMX trigger that calls the configured LLM provider on demand and dynamically renders root-cause forensic explanations and mitigation steps without a full page reload.
+
+![LogLens Security Events Grid](img/security_findings_grid.jpg)
 
 ---
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from datetime import UTC, datetime
 from typing import Protocol
 
@@ -116,3 +117,68 @@ class MockNotifier:
         ]
         self.sent_digests.append((qualified, report_meta))
         return True
+
+
+logger = logging.getLogger(__name__)
+
+
+class CompositeNotifier:
+    """Dispatches alerts and digests to multiple underlying notifiers."""
+
+    name: str = "composite"
+
+    def __init__(
+        self,
+        notifiers: list[Notifier] | None = None,
+        min_severity: str = "medium",
+    ) -> None:
+        self.notifiers: list[Notifier] = notifiers or []
+        self.min_severity = min_severity.lower()
+
+    def _is_configured(self) -> bool:
+        """True if at least one underlying notifier is configured."""
+        if not self.notifiers:
+            return False
+        for n in self.notifiers:
+            if not hasattr(n, "_is_configured") or bool(n._is_configured()):
+                return True
+        return False
+
+    def send_alert(self, finding: Finding, report_meta: ReportMetadata | None = None) -> bool:
+        """Send alert to all configured underlying notifiers."""
+        f_lvl = SEVERITY_LEVELS.get(finding.rule_severity.lower(), 1)
+        min_lvl = SEVERITY_LEVELS.get(self.min_severity, 1)
+        if f_lvl < min_lvl:
+            return False
+
+        any_sent = False
+        for notifier in self.notifiers:
+            try:
+                if hasattr(notifier, "_is_configured") and not notifier._is_configured():
+                    continue
+                if notifier.send_alert(finding, report_meta):
+                    any_sent = True
+            except Exception as e:
+                logger.warning(
+                    "Error dispatching alert to %s: %s",
+                    getattr(notifier, "name", str(notifier)),
+                    e,
+                )
+        return any_sent
+
+    def send_digest(self, findings: list[Finding], report_meta: ReportMetadata) -> bool:
+        """Send digest to all configured underlying notifiers."""
+        any_sent = False
+        for notifier in self.notifiers:
+            try:
+                if hasattr(notifier, "_is_configured") and not notifier._is_configured():
+                    continue
+                if notifier.send_digest(findings, report_meta):
+                    any_sent = True
+            except Exception as e:
+                logger.warning(
+                    "Error dispatching digest to %s: %s",
+                    getattr(notifier, "name", str(notifier)),
+                    e,
+                )
+        return any_sent

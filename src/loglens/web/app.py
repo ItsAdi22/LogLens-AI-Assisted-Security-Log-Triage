@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import json
 import logging
 import os
 import urllib.parse
@@ -32,7 +33,7 @@ from loglens.cluster import DrainClusterer, extract_classified_errors
 from loglens.ingest import group_multiline_logs
 from loglens.llm import LLMProvider, MockLLMProvider, TriageOrchestrator, get_provider
 from loglens.models import Event, Finding, LLMAssessment, Report, ReportMetadata
-from loglens.notify import DiscordNotifier, TelegramNotifier, WebhookNotifier
+from loglens.notify import CompositeNotifier, DiscordNotifier, TelegramNotifier, WebhookNotifier
 from loglens.notify.base import SEVERITY_LEVELS
 from loglens.parsers import registry
 from loglens.redact import Redactor
@@ -107,6 +108,40 @@ def resolve_notifier(
         sec = settings.get("generic_webhook_secret") or os.environ.get("LOGLENS_WEBHOOK_SECRET", "")
         return WebhookNotifier(webhook_url=url, secret=sec, min_severity=min_severity)
     raise HTTPException(status_code=400, detail=f"Unsupported notification channel: '{channel}'")
+
+
+def resolve_auto_notifier(settings: dict[str, str]) -> Any:
+    """Resolve configured and enabled notifiers into a unified Notifier instance."""
+    if settings.get("auto_notify_enabled") != "true":
+        return None
+
+    min_sev = settings.get("auto_notify_min_severity", "high").lower()
+
+    candidates: list[str] = []
+    if settings.get("auto_notify_telegram") == "true":
+        candidates.append("telegram")
+    if settings.get("auto_notify_discord") == "true":
+        candidates.append("discord")
+    if settings.get("auto_notify_webhook") == "true":
+        candidates.append("webhook")
+
+    if not candidates:
+        candidates = ["telegram", "discord", "webhook"]
+
+    active: list[Any] = []
+    for ch in candidates:
+        try:
+            notif = resolve_notifier(ch, settings, min_severity=min_sev)
+            if hasattr(notif, "_is_configured") and bool(notif._is_configured()):
+                active.append(notif)
+        except Exception as exc:
+            logger.warning("Failed to configure candidate notifier %s: %s", ch, exc)
+
+    if not active:
+        return None
+    if len(active) == 1:
+        return active[0]
+    return CompositeNotifier(active, min_severity=min_sev)
 
 
 def dispatch_auto_notifications(
@@ -546,8 +581,12 @@ def create_app(
         clean_path = log_path.strip()
         if not clean_path:
             raise HTTPException(status_code=400, detail="Log file path is required.")
+        settings = storage.get_all_settings()
+        notifier = resolve_auto_notifier(settings)
         try:
-            live_manager.start_watch(clean_path, interval=interval, from_start=from_start)
+            live_manager.start_watch(
+                clean_path, interval=interval, from_start=from_start, notifier=notifier
+            )
         except FileNotFoundError as fnf:
             raise HTTPException(status_code=404, detail=str(fnf)) from fnf
 
@@ -645,10 +684,7 @@ def create_app(
                 key_path = tmp_key.name
 
         settings = storage.get_all_settings()
-        notifier = None
-        if settings.get("auto_notify_enabled") == "true":
-            target_ch = "telegram" if settings.get("auto_notify_telegram") == "true" else "discord"
-            notifier = resolve_notifier(target_ch, settings)
+        notifier = resolve_auto_notifier(settings)
 
         try:
             live_manager.start_ssh_watch(
@@ -935,6 +971,8 @@ def create_app(
 
         security_findings = [f for f in report.findings if not _is_noise(f)]
         noise_findings = [f for f in report.findings if _is_noise(f)]
+        clusters_by_id = {c.id: c.model_dump(mode="json") for c in report.clusters}
+        findings_by_id = {f.id: f.model_dump(mode="json") for f in report.findings}
 
         return templates.TemplateResponse(
             request=request,
@@ -945,6 +983,8 @@ def create_app(
                 "findings": security_findings,
                 "noise_findings": noise_findings,
                 "classified_errors": classified_errors,
+                "clusters_by_id_json": json.dumps(clusters_by_id),
+                "findings_by_id_json": json.dumps(findings_by_id),
             },
         )
 

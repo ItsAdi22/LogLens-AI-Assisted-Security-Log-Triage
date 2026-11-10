@@ -118,8 +118,14 @@
   </div>
 
   <!-- Bottom Notification Bar -->
-  <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid var(--border); margin-top: 8px;">
-    <div id="finding-{{ finding.id }}-alert-status" style="font-size: 11px; color: var(--text-muted);"></div>
+  <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid var(--border); margin-top: 8px; gap: 8px;">
+    <div style="display: flex; align-items: center; gap: 6px;">
+      <button type="button" class="btn btn-secondary btn-sm" onclick="openStackModal('{{ finding.id }}')" title="View underlying raw log stack and matched templates with syntax highlighting" style="padding: 4px 9px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+        Open stack
+      </button>
+      <div id="finding-{{ finding.id }}-alert-status" style="font-size: 11px; color: var(--text-muted);"></div>
+    </div>
     <div style="display: flex; gap: 6px;">
       <button type="button" class="btn btn-secondary btn-sm"
               hx-post="/runs/{{ run_id }}/findings/{{ finding.id }}/notify?channel=telegram"

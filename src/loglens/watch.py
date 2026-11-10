@@ -227,7 +227,7 @@ def discover_remote_sources(client: Any) -> dict[str, list[str]]:
         "/var/log/httpd/access_log /var/log/httpd/error_log; do\n"
         '  if [ -f "$f" ]; then echo "$f"; fi\n'
         "done\n"
-        "for h in /home/*/logs/*.access_log /home/*/logs/*.error_log; do\n"
+        "for h in /home/*/logs/*.access_log /home/*/logs/*.error_log /var/www/*/storage/logs/*.log ~/pelican-panel/storage/logs/*.log /root/pelican-panel/storage/logs/*.log; do\n"
         '  if [ -f "$h" ]; then echo "$h"; fi\n'
         "done\n"
         'echo "===DOCKER==="\n'
@@ -235,7 +235,7 @@ def discover_remote_sources(client: Any) -> dict[str, list[str]]:
         '  docker ps --format "{{.Names}}" 2>/dev/null\n'
         "fi\n"
         'echo "===COMPOSE==="\n'
-        "for d in ~/pelican-panel /root/pelican-panel /var/www/pelican /var/www/pterodactyl; do\n"
+        "for d in ~/pelican-panel /root/pelican-panel /var/www/pelican /var/www/pterodactyl /var/www/*; do\n"
         '  if [ -d "$d" ]; then echo "$d"; fi\n'
         "done\n"
         "'"
@@ -304,6 +304,8 @@ def summarize_discovered_sources(discovered: dict[str, list[str]]) -> str:
         parts.append("Apache")
     if any("/home/" in f for f in files):
         parts.append("Site vhosts")
+    if any("laravel" in f or "storage/logs" in f for f in files):
+        parts.append("Panel logs")
     if any("syslog" in f or "messages" in f for f in files) and not parts:
         parts.append("syslog")
     if containers:
@@ -518,10 +520,10 @@ class LiveSSHMonitor(WatchMonitor):
                             self.clusterer.add_event(ev)
                     self._process_cycle(events, len(buffer), on_cycle_complete)
 
-            # Check if remote process exited with error
-            if channel.exit_status_ready():
+            # Check if remote process exited with error unexpectedly while still running
+            if self._running and channel.exit_status_ready():
                 exit_code = channel.recv_exit_status()
-                if exit_code != 0:
+                if exit_code not in (0, -1):
                     err_msg = (
                         " ".join(recent_output[-3:]).strip()
                         or f"Process exited with code {exit_code}"
@@ -675,7 +677,10 @@ class LiveWatchManager:
             nonlocal last_logged_activity
             with self._lock:
                 sess = self._sessions.get(session_id)
-                current_label = sess.source_label if sess else source_label
+                # Keep session label in sync if monitor updated it with discovered sources
+                if sess and monitor.source_label and sess.source_label != monitor.source_label:
+                    sess.source_label = monitor.source_label
+                current_label = sess.source_label if sess else monitor.source_label or source_label
                 if sess:
                     sess.last_activity = datetime.now(UTC)
                     sess.total_findings += len(findings)
@@ -704,7 +709,7 @@ class LiveWatchManager:
                         source=current_label,
                         event_count=events_count,
                         findings_count=0,
-                        message=f"Streamed {lines_count} log line(s) from {current_label} ({events_count} parsed events, 0 threats)",
+                        message=f"Streamed {lines_count} log line(s) ({events_count} parsed events, 0 threats)",
                         severity="info",
                     )
                     last_logged_activity = now
@@ -728,9 +733,14 @@ class LiveWatchManager:
             try:
                 monitor.run(on_cycle_complete=on_cycle)
             except Exception as e:
-                logger.error("Error in live SSH watch session %s: %s", session_id, e)
                 with self._lock:
                     sess = self._sessions.get(session_id)
+                    # If monitor was intentionally stopped or closed by the user, ignore channel termination
+                    if not monitor._running or (sess and sess.status == "STOPPED"):
+                        if sess:
+                            sess.status = "STOPPED"
+                        return
+                    logger.error("Error in live SSH watch session %s: %s", session_id, e)
                     current_label = sess.source_label if sess else source_label
                     if sess:
                         sess.status = "ERROR"
@@ -772,8 +782,8 @@ class LiveWatchManager:
             sess = self._sessions.get(session_id)
             if not sess:
                 return False
-            sess.monitor.stop()
             sess.status = "STOPPED"
+            sess.monitor.stop()
             self.record_activity(
                 source=sess.source_label,
                 event_count=0,
