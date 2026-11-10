@@ -31,10 +31,12 @@ from loglens.ingest import group_multiline_logs
 from loglens.llm import LLMProvider, MockLLMProvider, TriageOrchestrator, get_provider
 from loglens.models import Event, Finding, LLMAssessment, Report, ReportMetadata
 from loglens.notify import DiscordNotifier, TelegramNotifier, WebhookNotifier
+from loglens.notify.base import SEVERITY_LEVELS
 from loglens.parsers import registry
 from loglens.redact import Redactor
 from loglens.rules import RuleEngine, get_builtin_rules
 from loglens.store import DEFAULT_DB_PATH, StorageManager
+from loglens.watch import LiveWatchManager
 
 MODULE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = MODULE_DIR / "static"
@@ -62,21 +64,75 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def resolve_notifier(channel: str, settings: dict[str, str]) -> Any:
+def resolve_notifier(
+    channel: str,
+    settings: dict[str, str],
+    min_severity: str = "info",
+) -> Any:
     """Resolve and configure a notification backend using stored settings or env vars."""
     norm = channel.strip().lower()
     if norm == "telegram":
         token = settings.get("telegram_bot_token") or os.environ.get("TELEGRAM_BOT_TOKEN", "")
         chat = settings.get("telegram_chat_id") or os.environ.get("TELEGRAM_CHAT_ID", "")
-        return TelegramNotifier(bot_token=token, chat_id=chat, min_severity="info")
+        return TelegramNotifier(bot_token=token, chat_id=chat, min_severity=min_severity)
     if norm == "discord":
         url = settings.get("discord_webhook_url") or os.environ.get("DISCORD_WEBHOOK_URL", "")
-        return DiscordNotifier(webhook_url=url, min_severity="info")
+        return DiscordNotifier(webhook_url=url, min_severity=min_severity)
     if norm == "webhook":
         url = settings.get("generic_webhook_url") or os.environ.get("LOGLENS_WEBHOOK_URL", "")
         sec = settings.get("generic_webhook_secret") or os.environ.get("LOGLENS_WEBHOOK_SECRET", "")
-        return WebhookNotifier(webhook_url=url, secret=sec, min_severity="info")
+        return WebhookNotifier(webhook_url=url, secret=sec, min_severity=min_severity)
     raise HTTPException(status_code=400, detail=f"Unsupported notification channel: '{channel}'")
+
+
+def dispatch_auto_notifications(
+    findings: list[Finding],
+    meta: ReportMetadata,
+    storage: StorageManager,
+    force: bool = False,
+) -> int:
+    """Dispatch alerts to configured notification channels according to anti-spam thresholds."""
+    if not findings:
+        return 0
+
+    saved_settings = storage.get_all_settings()
+    is_auto = saved_settings.get("auto_notify_enabled") == "true" or force
+    if not is_auto:
+        return 0
+
+    min_sev = saved_settings.get("auto_notify_min_severity", "high").lower()
+    min_rank = SEVERITY_LEVELS.get(min_sev, 4)
+
+    # Filter findings: only send ones >= min_severity threshold to eliminate channel spam
+    qualifying = [
+        f for f in findings if SEVERITY_LEVELS.get(f.rule_severity.lower(), 1) >= min_rank
+    ]
+    if not qualifying:
+        return 0
+
+    target_channels: list[str] = []
+    if saved_settings.get("auto_notify_telegram") == "true":
+        target_channels.append("telegram")
+    if saved_settings.get("auto_notify_discord") == "true":
+        target_channels.append("discord")
+    if saved_settings.get("auto_notify_webhook") == "true":
+        target_channels.append("webhook")
+
+    if not target_channels:
+        target_channels = ["telegram", "discord", "webhook"]
+
+    dispatched = 0
+    for ch in target_channels:
+        try:
+            notif = resolve_notifier(ch, saved_settings, min_severity=min_sev)
+            if getattr(notif, "_is_configured", lambda: False)() and notif.send_digest(
+                qualifying, meta
+            ):
+                dispatched += 1
+        except Exception as exc:
+            logger.warning("Auto-dispatch notification to %s failed: %s", ch, exc)
+
+    return dispatched
 
 
 def create_test_finding() -> Finding:
@@ -145,6 +201,11 @@ def create_app(
         provider = get_provider(provider_name, model=model)
 
     orchestrator = TriageOrchestrator(provider=provider, redactor=Redactor(level="standard"))
+    live_manager = LiveWatchManager(storage=storage)
+
+    @app.on_event("shutdown")
+    def shutdown_live_monitors() -> None:
+        live_manager.stop_all()
 
     # Auth dependency
     def verify_token(request: Request) -> None:
@@ -326,16 +387,8 @@ def create_app(
         )
         new_run_id = storage.save_run(report)
 
-        # Optional auto-dispatch notification if threats are detected
-        if notify_on_complete and findings:
-            saved_settings = storage.get_all_settings()
-            for ch in ("telegram", "discord", "webhook"):
-                try:
-                    notif = resolve_notifier(ch, saved_settings)
-                    if getattr(notif, "_is_configured", lambda: False)():
-                        notif.send_digest(findings, meta)
-                except Exception as exc:
-                    logger.warning("Auto-dispatch notification to %s failed: %s", ch, exc)
+        # Automatic notification dispatch with anti-spam thresholding
+        dispatch_auto_notifications(findings, meta, storage, force=notify_on_complete)
 
         return RedirectResponse(
             url=f"/runs/{new_run_id}",
@@ -365,6 +418,11 @@ def create_app(
         discord_webhook_url: str = Form(""),
         generic_webhook_url: str = Form(""),
         generic_webhook_secret: str = Form(""),
+        auto_notify_enabled: bool = Form(False),
+        auto_notify_min_severity: str = Form("high"),
+        auto_notify_telegram: bool = Form(False),
+        auto_notify_discord: bool = Form(False),
+        auto_notify_webhook: bool = Form(False),
     ) -> HTMLResponse:
         """Save third-party notification credentials to the local settings store."""
         storage.set_setting("telegram_bot_token", telegram_bot_token.strip())
@@ -372,6 +430,13 @@ def create_app(
         storage.set_setting("discord_webhook_url", discord_webhook_url.strip())
         storage.set_setting("generic_webhook_url", generic_webhook_url.strip())
         storage.set_setting("generic_webhook_secret", generic_webhook_secret.strip())
+        storage.set_setting("auto_notify_enabled", "true" if auto_notify_enabled else "false")
+        storage.set_setting(
+            "auto_notify_min_severity", auto_notify_min_severity.strip().lower() or "high"
+        )
+        storage.set_setting("auto_notify_telegram", "true" if auto_notify_telegram else "false")
+        storage.set_setting("auto_notify_discord", "true" if auto_notify_discord else "false")
+        storage.set_setting("auto_notify_webhook", "true" if auto_notify_webhook else "false")
 
         settings_dict = storage.get_all_settings()
         stats = storage.get_global_stats()
@@ -384,6 +449,159 @@ def create_app(
                 "stats": stats,
             },
         )
+
+    @app.get("/live", response_class=HTMLResponse, dependencies=[Depends(verify_token)])
+    def live_page(request: Request) -> HTMLResponse:
+        """Render the live server monitoring dashboard and remote ingestion guides."""
+        sessions = live_manager.list_sessions()
+        feed_items = list(live_manager.recent_activities)
+        return templates.TemplateResponse(
+            request=request,
+            name="live.html",
+            context={
+                "sessions": sessions,
+                "feed_items": feed_items,
+            },
+        )
+
+    @app.post("/live/start", dependencies=[Depends(verify_token)])
+    def live_start(
+        request: Request,
+        log_path: str = Form(...),
+        interval: float = Form(2.0),
+        from_start: bool = Form(False),
+    ) -> Response:
+        """Start a new background live watch monitor for a server file."""
+        clean_path = log_path.strip()
+        if not clean_path:
+            raise HTTPException(status_code=400, detail="Log file path is required.")
+        try:
+            live_manager.start_watch(clean_path, interval=interval, from_start=from_start)
+        except FileNotFoundError as fnf:
+            raise HTTPException(status_code=404, detail=str(fnf)) from fnf
+
+        if request.headers.get("HX-Request"):
+            return Response(headers={"HX-Redirect": "/live"})
+        return RedirectResponse(url="/live", status_code=status.HTTP_303_SEE_OTHER)
+
+    @app.post("/live/stop", dependencies=[Depends(verify_token)])
+    def live_stop(request: Request, session_id: str = Form(...)) -> Response:
+        """Stop an active live watch session."""
+        live_manager.stop_watch(session_id.strip())
+        if request.headers.get("HX-Request"):
+            return Response(headers={"HX-Redirect": "/live"})
+        return RedirectResponse(url="/live", status_code=status.HTTP_303_SEE_OTHER)
+
+    @app.get("/api/live/feed", response_class=HTMLResponse, dependencies=[Depends(verify_token)])
+    def live_feed_partial(request: Request) -> HTMLResponse:
+        """HTMX partial polling endpoint returning recent live activities."""
+        feed_items = list(live_manager.recent_activities)
+        sessions = live_manager.list_sessions()
+        return templates.TemplateResponse(
+            request=request,
+            name="partials/live_feed.html",
+            context={
+                "feed_items": feed_items,
+                "sessions": sessions,
+            },
+        )
+
+    @app.post("/api/ingest/stream", dependencies=[Depends(verify_token)])
+    async def ingest_stream(
+        request: Request,
+        source: str = "remote-stream.log",
+        format_hint: str = "auto",
+    ) -> dict[str, Any]:
+        """Ingest streaming or batched logs sent from a remote VPS, container, or live pipe."""
+        body_bytes = await request.body()
+        content = body_bytes.decode("utf-8", errors="replace").strip()
+        if not content:
+            raise HTTPException(status_code=400, detail="Empty log payload received.")
+
+        raw_lines = [line for line in content.splitlines() if line.strip()]
+        if not raw_lines:
+            raise HTTPException(status_code=400, detail="No readable log lines in payload.")
+
+        # Autodetect or resolve parser
+        if format_hint and format_hint != "auto":
+            p = registry.get(format_hint)
+        else:
+            p = registry.autodetect(raw_lines[:50])
+
+        if not p:
+            p = registry.get("generic")
+            if not p:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="No log parser could be resolved.",
+                )
+
+        clusterer = DrainClusterer()
+        all_events: list[Event] = []
+        for line_num, primary_line, continuations in group_multiline_logs(raw_lines):
+            event = p.parse_line(primary_line, line_num)
+            if event:
+                if continuations:
+                    event_fields = dict(event.fields)
+                    event_fields["stacktrace"] = "\n".join(continuations)
+                    event = Event(
+                        ts=event.ts,
+                        source=event.source,
+                        host=event.host,
+                        severity_hint=event.severity_hint or "error",
+                        message=event.message,
+                        fields=event_fields,
+                        raw_hash=event.raw_hash,
+                    )
+                all_events.append(event)
+                clusterer.add_event(event)
+
+        clusters = clusterer.get_clusters()
+        rule_engine = RuleEngine(get_builtin_rules())
+        findings = rule_engine.evaluate(all_events, clusters)
+
+        log_source_name = request.headers.get("X-Log-Source", source)
+        meta = ReportMetadata(
+            generated_at=datetime.now(UTC),
+            log_source=log_source_name,
+            total_lines=len(raw_lines),
+            parsed_events=len(all_events),
+            unparsed_lines=len(raw_lines) - len(all_events),
+            total_clusters=len(clusters),
+            findings_count=len(findings),
+        )
+        report = Report(metadata=meta, findings=findings, clusters=clusters)
+        new_run_id = storage.save_run(report)
+
+        # Record activity in live feed
+        top_sev = (
+            max(
+                (f.rule_severity.lower() for f in findings),
+                key=lambda s: SEVERITY_LEVELS.get(s, 1),
+                default="info",
+            )
+            if findings
+            else "info"
+        )
+        live_manager.record_activity(
+            source=log_source_name,
+            event_count=len(all_events),
+            findings_count=len(findings),
+            message=f"Received {len(all_events)} events from remote stream ({len(findings)} findings).",
+            severity=top_sev,
+        )
+
+        # Auto-dispatch notifications with anti-spam filtering
+        dispatch_auto_notifications(findings, meta, storage)
+
+        return {
+            "status": "success",
+            "run_id": new_run_id,
+            "parsed_events": len(all_events),
+            "total_clusters": len(clusters),
+            "findings_count": len(findings),
+            "report_url": f"/runs/{new_run_id}",
+        }
 
     @app.post("/api/runs/clear", dependencies=[Depends(verify_token)])
     def clear_all_runs(request: Request) -> Response:

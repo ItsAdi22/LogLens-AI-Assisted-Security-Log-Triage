@@ -548,3 +548,108 @@ def test_delete_run_and_clear_all_runs_endpoints(tmp_path: Path) -> None:
     res_dash = client.get("/")
     assert res_dash.status_code == 200
     assert "No triage runs recorded yet." in res_dash.text
+
+
+def test_live_monitoring_endpoints(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    dummy_log = tmp_path / "srv_auth.log"
+    dummy_log.write_text("Nov 10 10:00:00 srv sshd[1]: Test line\n", encoding="utf-8")
+
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    # 1. GET /live page
+    res_live = client.get("/live")
+    assert res_live.status_code == 200
+    assert "Live Server Monitoring" in res_live.text
+    assert "Connect Remote Servers" in res_live.text
+
+    # 2. POST /live/start missing file fails with 404
+    res_fail = client.post("/live/start", data={"log_path": str(tmp_path / "none.log")})
+    assert res_fail.status_code == 404
+
+    # 3. POST /live/start real file succeeds
+    res_start = client.post(
+        "/live/start", data={"log_path": str(dummy_log), "interval": 1.0}, follow_redirects=False
+    )
+    assert res_start.status_code == 303
+    assert res_start.headers["location"] == "/live"
+
+    # 4. Check /api/live/feed
+    res_feed = client.get("/api/live/feed")
+    assert res_feed.status_code == 200
+
+    # 5. POST /live/stop
+    res_page = client.get("/live")
+    assert res_page.status_code == 200
+    # Stop watcher
+    res_stop = client.post("/live/stop", data={"session_id": "watch-dummy"}, follow_redirects=False)
+    assert res_stop.status_code == 303
+
+
+def test_remote_stream_ingest_and_auto_notify(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    storage = StorageManager(db_file)
+    # Enable auto notify with high threshold and discord webhook
+    storage.set_setting("auto_notify_enabled", "true")
+    storage.set_setting("auto_notify_min_severity", "high")
+    storage.set_setting("discord_webhook_url", "https://discord.com/api/webhooks/test")
+    storage.close()
+
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    # 1. Stream attack log (triggers SSH brute force)
+    attack_payload = (
+        "Nov 10 12:00:01 srv sshd[100]: Failed password for invalid user root from 198.51.100.42 port 50001 ssh2\n"
+        "Nov 10 12:00:02 srv sshd[101]: Failed password for invalid user root from 198.51.100.42 port 50002 ssh2\n"
+        "Nov 10 12:00:03 srv sshd[102]: Failed password for invalid user root from 198.51.100.42 port 50003 ssh2\n"
+        "Nov 10 12:00:04 srv sshd[103]: Failed password for invalid user root from 198.51.100.42 port 50004 ssh2\n"
+        "Nov 10 12:00:05 srv sshd[104]: Failed password for invalid user root from 198.51.100.42 port 50005 ssh2\n"
+        "Nov 10 12:00:06 srv sshd[105]: Failed password for invalid user root from 198.51.100.42 port 50006 ssh2\n"
+    )
+
+    res_stream = client.post(
+        "/api/ingest/stream",
+        content=attack_payload,
+        headers={"X-Log-Source": "vps-pterodactyl.log"},
+    )
+    assert res_stream.status_code == 200
+    data = res_stream.json()
+    assert data["status"] == "success"
+    assert data["parsed_events"] == 6
+    assert data["findings_count"] >= 1
+    assert data["run_id"].startswith("run-")
+
+    # 2. Empty payload fails
+    res_empty = client.post("/api/ingest/stream", content="")
+    assert res_empty.status_code == 400
+
+
+def test_settings_auto_notify_anti_spam(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    # Save anti-spam and auto-notify options
+    res = client.post(
+        "/settings",
+        data={
+            "auto_notify_enabled": "true",
+            "auto_notify_min_severity": "high",
+            "auto_notify_telegram": "true",
+            "auto_notify_discord": "true",
+            "telegram_bot_token": "tok123",
+            "telegram_chat_id": "chat456",
+            "discord_webhook_url": "https://discord.com/webhook",
+        },
+    )
+    assert res.status_code == 200
+    assert "Settings Saved Successfully!" in res.text
+
+    storage = StorageManager(db_file)
+    assert storage.get_setting("auto_notify_enabled") == "true"
+    assert storage.get_setting("auto_notify_min_severity") == "high"
+    assert storage.get_setting("auto_notify_telegram") == "true"
+    assert storage.get_setting("auto_notify_discord") == "true"
+    storage.close()

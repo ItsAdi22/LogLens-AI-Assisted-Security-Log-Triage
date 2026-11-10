@@ -6,7 +6,7 @@ from loglens.models import Finding
 from loglens.notify.base import MockNotifier
 from loglens.parsers.auth_log import AuthLogParser
 from loglens.store import StorageManager
-from loglens.watch import WatchMonitor
+from loglens.watch import LiveWatchManager, WatchMonitor
 
 
 def test_watch_monitor_detects_appended_attacks(tmp_path: Path) -> None:
@@ -53,4 +53,42 @@ def test_watch_monitor_detects_appended_attacks(tmp_path: Path) -> None:
 
     # Notifier should have received alert
     assert len(notifier.sent_alerts) > 0
+    storage.close()
+
+
+def test_live_watch_manager_lifecycle(tmp_path: Path) -> None:
+    storage = StorageManager(db_path=":memory:")
+    manager = LiveWatchManager(storage=storage)
+
+    # 1. Non-existent path raises FileNotFoundError
+    import pytest
+
+    with pytest.raises(FileNotFoundError):
+        manager.start_watch(tmp_path / "does_not_exist.log")
+
+    # 2. Start watch on real file
+    log_file = tmp_path / "active_watch.log"
+    log_file.write_text("Nov 10 10:00:00 srv sshd[1]: Initial log\n", encoding="utf-8")
+
+    session_id = manager.start_watch(log_file, interval=0.2, from_start=True)
+    assert session_id.startswith("watch-")
+
+    sessions = manager.list_sessions()
+    assert len(sessions) == 1
+    assert sessions[0]["session_id"] == session_id
+    assert sessions[0]["status"] == "ACTIVE"
+
+    # 3. Check activity feed
+    assert len(manager.recent_activities) >= 1
+    assert "Live watch started" in manager.recent_activities[0]["message"]
+
+    # 4. Stop session
+    assert manager.stop_watch(session_id) is True
+    assert manager.stop_watch("nonexistent") is False
+
+    updated_sessions = manager.list_sessions()
+    assert updated_sessions[0]["status"] == "STOPPED"
+
+    # 5. Stop all
+    manager.stop_all()
     storage.close()
