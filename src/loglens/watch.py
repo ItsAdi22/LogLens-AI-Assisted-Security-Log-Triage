@@ -21,7 +21,7 @@ from rich.console import Console
 from loglens.cluster import DrainClusterer
 from loglens.models import Event, Finding, Report, ReportMetadata
 from loglens.notify.base import SEVERITY_LEVELS, Notifier
-from loglens.parsers import Parser, registry
+from loglens.parsers import AdaptiveMultiParser, Parser, registry
 from loglens.rules import RuleEngine, get_builtin_rules
 from loglens.store import StorageManager
 
@@ -214,6 +214,141 @@ class WatchMonitor:
         self.console.print("[dim]LogLens watch monitor stopped cleanly.[/dim]")
 
 
+def discover_remote_sources(client: Any) -> dict[str, list[str]]:
+    """Inspect remote Linux VPS to discover available log files, docker containers, and compose directories."""
+    probe_script = (
+        "sh -c '\n"
+        "echo \"===FILES===\"\n"
+        "for f in "
+        "/var/log/auth.log /var/log/secure /var/log/syslog /var/log/messages "
+        "/usr/local/lsws/logs/access.log /usr/local/lsws/logs/error.log /usr/local/lsws/logs/stderr.log "
+        "/var/log/nginx/access.log /var/log/nginx/error.log "
+        "/var/log/apache2/access.log /var/log/apache2/error.log "
+        "/var/log/httpd/access_log /var/log/httpd/error_log; do\n"
+        "  if [ -f \"$f\" ]; then echo \"$f\"; fi\n"
+        "done\n"
+        "for h in /home/*/logs/*.access_log /home/*/logs/*.error_log; do\n"
+        "  if [ -f \"$h\" ]; then echo \"$h\"; fi\n"
+        "done\n"
+        "echo \"===DOCKER===\"\n"
+        "if command -v docker >/dev/null 2>&1; then\n"
+        "  docker ps --format \"{{.Names}}\" 2>/dev/null\n"
+        "fi\n"
+        "echo \"===COMPOSE===\"\n"
+        "for d in ~/pelican-panel /root/pelican-panel /var/www/pelican /var/www/pterodactyl; do\n"
+        "  if [ -d \"$d\" ]; then echo \"$d\"; fi\n"
+        "done\n"
+        "'"
+    )
+    try:
+        _stdin, stdout, _stderr = client.exec_command(probe_script, timeout=8.0)
+        output = stdout.read().decode("utf-8", errors="replace")
+    except Exception as exc:
+        logger.warning("Remote source discovery failed: %s", exc)
+        return {"files": [], "docker_containers": [], "compose_dirs": []}
+
+    files: list[str] = []
+    docker_containers: list[str] = []
+    compose_dirs: list[str] = []
+
+    section = ""
+    for line in output.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line in ("===FILES===", "---FILES---", "---AUTH---"):
+            section = "files"
+            continue
+        if line in ("===DOCKER===", "---DOCKER---"):
+            section = "docker"
+            continue
+        if line in ("===COMPOSE===", "---COMPOSE---", "---PELICAN---"):
+            section = "compose"
+            continue
+        if line in ("---OLS---",):
+            section = "ols"
+            continue
+
+        if section == "files":
+            files.append(line)
+        elif section == "docker":
+            docker_containers.append(line)
+        elif section == "compose":
+            compose_dirs.append(line)
+        elif section == "ols":
+            files.append(line)
+
+    return {
+        "files": files,
+        "docker_containers": docker_containers,
+        "compose_dirs": compose_dirs,
+    }
+
+
+def summarize_discovered_sources(discovered: dict[str, list[str]]) -> str:
+    """Generate a human-readable summary of discovered remote log sources."""
+    parts: list[str] = []
+    files = discovered.get("files", [])
+    containers = discovered.get("docker_containers", [])
+    compose_dirs = discovered.get("compose_dirs", [])
+
+    if compose_dirs:
+        parts.append(f"Pelican directory: {compose_dirs[0]}")
+    if any("auth.log" in f or "secure" in f for f in files):
+        parts.append("auth.log")
+    if any("lsws" in f for f in files):
+        parts.append("OpenLiteSpeed")
+    if any("nginx" in f for f in files):
+        parts.append("Nginx")
+    if any("apache" in f or "httpd" in f for f in files):
+        parts.append("Apache")
+    if any("/home/" in f for f in files):
+        parts.append("Site vhosts")
+    if any("syslog" in f or "messages" in f for f in files) and not parts:
+        parts.append("syslog")
+    if containers:
+        c_str = ", ".join(containers[:2])
+        parts.append(f"Docker ({c_str})")
+
+    if not parts:
+        return "system logs"
+    return " • ".join(parts)
+
+
+def build_unified_stream_command(discovered: dict[str, list[str]]) -> str:
+    """Build a unified compound shell command to tail all discovered remote logs and containers."""
+    files = discovered.get("files", [])
+    containers = discovered.get("docker_containers", [])
+    compose_dirs = discovered.get("compose_dirs", [])
+
+    commands: list[str] = []
+
+    if files:
+        files_str = " ".join(files)
+        commands.append(f"tail -q -n 30 -F {files_str} 2>/dev/null")
+    else:
+        commands.append("tail -q -n 30 -F /var/log/auth.log /var/log/secure /var/log/syslog 2>/dev/null")
+
+    if containers:
+        for c in containers[:4]:
+            commands.append(f"docker logs -f --tail=20 {c} 2>/dev/null")
+    elif compose_dirs:
+        c_dir = compose_dirs[0]
+        commands.append(f"cd {c_dir} && docker compose logs -f --tail=20 2>/dev/null")
+
+    if len(commands) == 1:
+        return commands[0]
+
+    sub_cmds = " & \n".join(f"({cmd})" for cmd in commands)
+    return (
+        "sh -c '\n"
+        "trap \"kill 0\" EXIT TERM INT\n"
+        f"{sub_cmds} &\n"
+        "wait\n"
+        "'"
+    )
+
+
 class LiveSSHMonitor(WatchMonitor):
     """Watches a remote VPS log stream over SSH in real time."""
 
@@ -224,7 +359,8 @@ class LiveSSHMonitor(WatchMonitor):
         username: str = "root",
         password: str | None = None,
         key_path: str | None = None,
-        remote_cmd: str = "tail -F /var/log/auth.log",
+        preset: str = "smart-auto",
+        remote_cmd: str = "auto",
         source_label: str = "remote-ssh.log",
         parser: Parser | None = None,
         notifier: Notifier | None = None,
@@ -248,6 +384,7 @@ class LiveSSHMonitor(WatchMonitor):
         self.username = username
         self.password = password
         self.key_path = key_path
+        self.preset = preset
         self.remote_cmd = remote_cmd
         self.source_label = source_label
         self._ssh_client: Any = None
@@ -298,7 +435,20 @@ class LiveSSHMonitor(WatchMonitor):
                     f"Failed to connect to {self.username}@{self.host}:{self.port}: {conn_err}"
                 ) from conn_err
 
-            stdin, stdout, _stderr = client.exec_command(self.remote_cmd, get_pty=True)
+            if self.remote_cmd in ("auto", "", None) or self.preset == "smart-auto":
+                discovered = discover_remote_sources(client)
+                exec_cmd = build_unified_stream_command(discovered)
+                summary_str = summarize_discovered_sources(discovered)
+                self.source_label = f"ssh://{self.username}@{self.host} (Unified: {summary_str})"
+                self.log_path = Path(self.source_label)
+                if self.parser is None or self.parser.name == "generic":
+                    self.parser = registry.get("adaptive") or AdaptiveMultiParser()
+            else:
+                exec_cmd = self.remote_cmd
+                if self.parser is None:
+                    self.parser = registry.get("adaptive") or AdaptiveMultiParser()
+
+            stdin, stdout, _stderr = client.exec_command(exec_cmd, get_pty=True)
             stdin.close()
             channel = stdout.channel
             channel.settimeout(0.2)
@@ -337,7 +487,7 @@ class LiveSSHMonitor(WatchMonitor):
                     last_flush = now
 
                     if not self.parser:
-                        self.parser = registry.autodetect(lines_to_process[:20]) or registry.get("generic")
+                        self.parser = registry.get("adaptive") or registry.autodetect(lines_to_process[:20]) or registry.get("generic")
                     p_active = self.parser or registry.get("generic")
 
                     if p_active is not None:
@@ -505,7 +655,8 @@ class LiveWatchManager:
         username: str = "root",
         password: str | None = None,
         key_path: str | None = None,
-        remote_cmd: str = "tail -n 50 -F /var/log/auth.log",
+        preset: str = "smart-auto",
+        remote_cmd: str = "auto",
         source_label: str = "remote-ssh.log",
         interval: float = 2.0,
         notifier: Notifier | None = None,
@@ -519,6 +670,7 @@ class LiveWatchManager:
             nonlocal last_logged_activity
             with self._lock:
                 sess = self._sessions.get(session_id)
+                current_label = sess.source_label if sess else source_label
                 if sess:
                     sess.last_activity = datetime.now(UTC)
                     sess.total_findings += len(findings)
@@ -533,10 +685,10 @@ class LiveWatchManager:
                         default="info",
                     )
                     self.record_activity(
-                        source=source_label,
+                        source=current_label,
                         event_count=len(findings),
                         findings_count=len(findings),
-                        message=f"Detected {len(findings)} security finding(s) on {source_label}",
+                        message=f"Detected {len(findings)} security finding(s) on {current_label}",
                         severity=top_sev,
                     )
                     last_logged_activity = now
@@ -544,10 +696,10 @@ class LiveWatchManager:
                     now - last_logged_activity >= 8.0 or (sess and sess.total_lines <= lines_count)
                 ):
                     self.record_activity(
-                        source=source_label,
+                        source=current_label,
                         event_count=events_count,
                         findings_count=0,
-                        message=f"Streamed {lines_count} log line(s) from {source_label} ({events_count} parsed events, 0 threats)",
+                        message=f"Streamed {lines_count} log line(s) from {current_label} ({events_count} parsed events, 0 threats)",
                         severity="info",
                     )
                     last_logged_activity = now
@@ -558,6 +710,7 @@ class LiveWatchManager:
             username=username,
             password=password,
             key_path=key_path,
+            preset=preset,
             remote_cmd=remote_cmd,
             source_label=source_label,
             notifier=notifier,
@@ -573,14 +726,15 @@ class LiveWatchManager:
                 logger.error("Error in live SSH watch session %s: %s", session_id, e)
                 with self._lock:
                     sess = self._sessions.get(session_id)
+                    current_label = sess.source_label if sess else source_label
                     if sess:
                         sess.status = "ERROR"
                         sess.error = str(e)
                     self.record_activity(
-                        source=source_label,
+                        source=current_label,
                         event_count=0,
                         findings_count=0,
-                        message=f"SSH stream failed on {source_label}: {e}",
+                        message=f"SSH stream failed on {current_label}: {e}",
                         severity="high",
                     )
 
@@ -682,7 +836,7 @@ def test_ssh_connection(
     password: str | None = None,
     key_path: str | None = None,
 ) -> dict[str, Any]:
-    """Test SSH connectivity and detect installed panels/services (Pelican, CyberPanel, Docker)."""
+    """Test SSH connectivity and detect installed panels, log files, and containers."""
     import paramiko
 
     client = paramiko.SSHClient()
@@ -699,40 +853,23 @@ def test_ssh_connection(
             look_for_keys=False,
             allow_agent=False,
         )
-        probe_cmd = (
-            "echo '---OS---'; uname -a 2>/dev/null; "
-            "echo '---DOCKER---'; which docker 2>/dev/null; "
-            "echo '---PELICAN---'; ls -d ~/pelican-panel /root/pelican-panel /var/www/pelican 2>/dev/null; "
-            "echo '---OLS---'; ls -d /usr/local/lsws 2>/dev/null; "
-            "echo '---AUTH---'; ls /var/log/auth.log /var/log/secure 2>/dev/null"
-        )
-        _stdin, stdout, _stderr = client.exec_command(probe_cmd, timeout=8.0)
-        output = stdout.read().decode("utf-8", errors="replace")
+        discovered = discover_remote_sources(client)
+        summary = summarize_discovered_sources(discovered)
+        file_count = len(discovered.get("files", []))
+        c_count = len(discovered.get("docker_containers", []))
+
         client.close()
 
-        has_docker = "---DOCKER---\n/" in output or "/docker" in output
-        pelican_match = [
-            line.strip()
-            for line in output.splitlines()
-            if "pelican" in line.lower() and "/" in line
-        ]
-        ols_match = "/usr/local/lsws" in output
-        uname_parts = output.split("---OS---\n")
-        uname_line = uname_parts[-1].split("\n")[0] if len(uname_parts) > 1 else "Linux"
-
-        details: list[str] = []
-        if pelican_match:
-            details.append(f"Pelican directory: {pelican_match[0]}")
-        if ols_match:
-            details.append("CyberPanel OpenLiteSpeed installed")
-        if has_docker:
-            details.append("Docker installed")
-
-        summary = " • ".join(details) if details else "Connected (Linux host)"
+        detail_msg = (
+            f"Connected to {username}@{host}. "
+            f"Detected: {summary} ({file_count} log file(s), {c_count} container(s)). "
+            f"Unified auto-stream ready!"
+        )
         return {
             "success": True,
-            "os": uname_line[:80],
-            "message": f"Connected to {username}@{host}. {summary}",
+            "os": "Linux host",
+            "message": detail_msg,
+            "discovered": discovered,
         }
     except Exception as exc:
         return {

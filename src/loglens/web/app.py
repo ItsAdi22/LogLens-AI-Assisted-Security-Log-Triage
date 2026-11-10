@@ -524,12 +524,14 @@ def create_app(
         """Render the live server monitoring dashboard and remote ingestion guides."""
         sessions = live_manager.list_sessions()
         feed_items = list(live_manager.recent_activities)
+        saved_profiles = storage.list_vps_profiles()
         return templates.TemplateResponse(
             request=request,
             name="live.html",
             context={
                 "sessions": sessions,
                 "feed_items": feed_items,
+                "saved_profiles": saved_profiles,
             },
         )
 
@@ -553,6 +555,19 @@ def create_app(
             return Response(headers={"HX-Redirect": "/live"})
         return RedirectResponse(url="/live", status_code=status.HTTP_303_SEE_OTHER)
 
+    @app.get("/api/live/ssh/profiles", dependencies=[Depends(verify_token)])
+    def live_ssh_profiles_list() -> list[dict[str, Any]]:
+        """List saved VPS profiles."""
+        return storage.list_vps_profiles()
+
+    @app.delete("/api/live/ssh/profiles/{profile_id}", dependencies=[Depends(verify_token)])
+    def live_ssh_profile_delete(profile_id: str) -> dict[str, Any]:
+        """Delete a saved VPS profile."""
+        success = storage.delete_vps_profile(profile_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Profile not found.")
+        return {"status": "ok", "deleted_id": profile_id}
+
     @app.post("/live/ssh/start", dependencies=[Depends(verify_token)])
     def live_ssh_start(
         request: Request,
@@ -561,17 +576,52 @@ def create_app(
         username: str = Form("root"),
         password: str = Form(""),
         key_content: str = Form(""),
-        preset: str = Form("pelican-app"),
+        preset: str = Form("smart-auto"),
         custom_cmd: str = Form(""),
         interval: float = Form(2.0),
+        profile_id: str = Form(""),
+        remember_server: bool = Form(False),
+        profile_name: str = Form(""),
     ) -> Response:
         """Start a new background live watch monitor over SSH directly from the browser."""
         clean_host = host.strip()
         clean_user = username.strip() or "root"
+        actual_password = password.strip()
+        actual_key = key_content.strip()
+
+        # Load saved credentials if profile_id provided and fields left blank
+        if profile_id.strip():
+            saved_prof = storage.get_vps_profile(profile_id.strip(), decrypt=True)
+            if saved_prof:
+                if not clean_host:
+                    clean_host = saved_prof.get("host", "")
+                if port == 22 and saved_prof.get("port"):
+                    port = int(saved_prof["port"])
+                if clean_user == "root" and saved_prof.get("username"):
+                    clean_user = saved_prof["username"]
+                if not actual_password and saved_prof.get("password"):
+                    actual_password = saved_prof["password"]
+                if not actual_key and saved_prof.get("key_content"):
+                    actual_key = saved_prof["key_content"]
+
         if not clean_host:
             raise HTTPException(status_code=400, detail="VPS IP or hostname is required.")
 
+        # Persist or update credentials in local vault if remember_server is requested
+        if remember_server:
+            storage.save_vps_profile(
+                name=profile_name.strip() or f"{clean_user}@{clean_host}",
+                host=clean_host,
+                port=port,
+                username=clean_user,
+                password=actual_password or None,
+                key_content=actual_key or None,
+                default_preset=preset,
+                profile_id=profile_id.strip() or None,
+            )
+
         cmd_map = {
+            "smart-auto": "auto",
             "pelican-compose": "cd ~/pelican-panel 2>/dev/null || cd /root/pelican-panel 2>/dev/null || true; docker compose logs -f --tail=50",
             "pelican-app": "cd ~/pelican-panel 2>/dev/null || cd /root/pelican-panel 2>/dev/null || true; docker compose logs -f --tail=50 2>/dev/null || docker compose exec -T panel tail -n 50 -F storage/logs/laravel-$(date +%Y-%m-%d).log 2>/dev/null || docker compose exec -T app tail -n 50 -F storage/logs/laravel-$(date +%Y-%m-%d).log",
             "pelican-caddy": "cd ~/pelican-panel 2>/dev/null || cd /root/pelican-panel 2>/dev/null || true; docker compose logs -f --tail=50 caddy",
@@ -581,15 +631,15 @@ def create_app(
             "linux-auth": "tail -n 50 -F /var/log/auth.log 2>/dev/null || tail -n 50 -F /var/log/secure",
             "custom": custom_cmd.strip(),
         }
-        chosen_cmd = cmd_map.get(preset, custom_cmd.strip() or "tail -n 50 -F /var/log/auth.log")
+        chosen_cmd = cmd_map.get(preset, "auto" if preset == "smart-auto" else custom_cmd.strip() or "auto")
         source_label = f"ssh://{clean_user}@{clean_host} ({preset})"
 
         key_path = None
-        if key_content.strip():
+        if actual_key:
             import tempfile
 
             with tempfile.NamedTemporaryFile(mode="w", delete=False) as tmp_key:
-                tmp_key.write(key_content.strip())
+                tmp_key.write(actual_key)
                 key_path = tmp_key.name
 
         settings = storage.get_all_settings()
@@ -603,8 +653,9 @@ def create_app(
                 host=clean_host,
                 port=port,
                 username=clean_user,
-                password=password.strip() or None,
+                password=actual_password or None,
                 key_path=key_path,
+                preset=preset,
                 remote_cmd=chosen_cmd,
                 source_label=source_label,
                 interval=max(0.5, min(interval, 60.0)),
@@ -624,10 +675,28 @@ def create_app(
         username: str = Form("root"),
         password: str = Form(""),
         key_content: str = Form(""),
+        profile_id: str = Form(""),
     ) -> HTMLResponse:
         """Test SSH connectivity and return HTMX diagnosis snippet."""
         clean_host = host.strip()
         clean_user = username.strip() or "root"
+        actual_password = password.strip()
+        actual_key = key_content.strip()
+
+        if profile_id.strip():
+            saved_prof = storage.get_vps_profile(profile_id.strip(), decrypt=True)
+            if saved_prof:
+                if not clean_host:
+                    clean_host = saved_prof.get("host", "")
+                if port == 22 and saved_prof.get("port"):
+                    port = int(saved_prof["port"])
+                if clean_user == "root" and saved_prof.get("username"):
+                    clean_user = saved_prof["username"]
+                if not actual_password and saved_prof.get("password"):
+                    actual_password = saved_prof["password"]
+                if not actual_key and saved_prof.get("key_content"):
+                    actual_key = saved_prof["key_content"]
+
         if not clean_host:
             return HTMLResponse(
                 '<div style="padding: 8px 12px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); border-radius: 4px; color: #f87171; font-size: 11px;">'
@@ -636,18 +705,18 @@ def create_app(
             )
 
         key_path = None
-        if key_content.strip():
+        if actual_key:
             import tempfile
 
             with tempfile.NamedTemporaryFile(mode="w", delete=False) as tmp_key:
-                tmp_key.write(key_content.strip())
+                tmp_key.write(actual_key)
                 key_path = tmp_key.name
 
         diag = test_ssh_connection(
             host=clean_host,
             port=port,
             username=clean_user,
-            password=password.strip() or None,
+            password=actual_password or None,
             key_path=key_path,
         )
 

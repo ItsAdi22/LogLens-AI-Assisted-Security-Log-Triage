@@ -15,3 +15,4 @@ tags:
   - system.logind
 false_positives:
   - Normal interactive login and logout activity
+

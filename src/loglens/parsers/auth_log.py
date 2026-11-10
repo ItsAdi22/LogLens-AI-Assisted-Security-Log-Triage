@@ -185,6 +185,9 @@ class AuthLogParser:
         # Fallback extraction for PAM sessions, cron, systemd-logind, and SSH preauth
         extract_common_system_fields(msg, fields)
 
+        if not m_iso and not m_leg and not fields.get("action") and not fields.get("service"):
+            return None
+
         if fields.get("action") == "preauth_reset":
             severity_hint = "low"
             if source == "auth":

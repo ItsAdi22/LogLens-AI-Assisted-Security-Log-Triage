@@ -17,3 +17,4 @@ references:
   - https://attack.mitre.org/techniques/T1087/001/
 false_positives:
   - Legitimate user mistyping their username during initial SSH connection
+

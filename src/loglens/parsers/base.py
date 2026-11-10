@@ -18,7 +18,7 @@ RE_PAM_FAILURE = re.compile(
     re.IGNORECASE,
 )
 RE_CRON_CMD = re.compile(
-    r"(?:CRON|cron)(?:\[(?P<pid>[0-9]+)\])?:\s*\((?P<user>[^)]+)\)\s*(?P<action>CMD|RELOAD)\s*\((?P<cmd>.*)\)",
+    r"(?:(?:CRON|cron)(?:\[(?P<pid>[0-9]+)\])?:\s*)?\((?P<user>[^)]+)\)\s*(?P<action>CMD|RELOAD)\s*\((?P<cmd>.*)\)",
     re.IGNORECASE,
 )
 RE_SYSTEMD_LOGIND_NEW = re.compile(

@@ -148,3 +148,4 @@ def get_rule_remediation(rule_ids: list[str]) -> str:
             if rid.startswith(key) or key.startswith(rid):
                 return text
     return DEFAULT_REMEDIATION
+

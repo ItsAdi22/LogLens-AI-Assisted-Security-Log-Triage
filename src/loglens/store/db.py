@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from loglens.models import Cluster, Finding, LLMAssessment, Report, ReportMetadata
+from loglens.store.vault import LocalVault
 
 DEFAULT_DB_PATH = Path.home() / ".config" / "loglens" / "loglens.db"
 
@@ -17,15 +18,22 @@ DEFAULT_DB_PATH = Path.home() / ".config" / "loglens" / "loglens.db"
 class StorageManager:
     """Manages SQLite persistence for LogLens triage runs, findings, and clusters."""
 
-    def __init__(self, db_path: Path | str | None = None) -> None:
+    def __init__(
+        self,
+        db_path: Path | str | None = None,
+        vault: LocalVault | None = None,
+    ) -> None:
         if db_path is None:
             db_path = DEFAULT_DB_PATH
         if db_path != ":memory:":
             p = Path(db_path)
             p.parent.mkdir(parents=True, exist_ok=True)
             self.db_path = str(p)
+            vault_key_path = p.parent / ".vault.key"
+            self._vault = vault or LocalVault(key_path=vault_key_path)
         else:
             self.db_path = ":memory:"
+            self._vault = vault or LocalVault(ephemeral=True)
 
         self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
@@ -119,6 +127,34 @@ class StorageManager:
                     (2, datetime.now(UTC).isoformat()),
                 )
 
+            if current_version < 3:
+                self._conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS vps_profiles (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        host TEXT NOT NULL,
+                        port INTEGER NOT NULL DEFAULT 22,
+                        username TEXT NOT NULL DEFAULT 'root',
+                        encrypted_password TEXT,
+                        encrypted_key TEXT,
+                        default_preset TEXT NOT NULL DEFAULT 'smart-auto',
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                    """
+                )
+                self._conn.execute(
+                    """
+                    CREATE INDEX IF NOT EXISTS idx_vps_profiles_host
+                    ON vps_profiles (host, username)
+                    """
+                )
+                self._conn.execute(
+                    "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",
+                    (3, datetime.now(UTC).isoformat()),
+                )
+
     def get_setting(self, key: str, default: str | None = None) -> str | None:
         """Retrieve a stored configuration setting by key."""
         cursor = self._conn.cursor()
@@ -142,6 +178,131 @@ class StorageManager:
         cursor = self._conn.cursor()
         cursor.execute("SELECT key, value FROM settings")
         return {str(row[0]): str(row[1]) for row in cursor.fetchall()}
+
+    def save_vps_profile(
+        self,
+        name: str,
+        host: str,
+        port: int = 22,
+        username: str = "root",
+        password: str | None = None,
+        key_content: str | None = None,
+        default_preset: str = "smart-auto",
+        profile_id: str | None = None,
+    ) -> str:
+        """Store or update a VPS profile with encrypted credentials."""
+        now_iso = datetime.now(UTC).isoformat()
+        cursor = self._conn.cursor()
+
+        actual_id = profile_id
+        if not actual_id:
+            cursor.execute(
+                "SELECT id FROM vps_profiles WHERE host = ? AND username = ?",
+                (host.strip(), username.strip() or "root"),
+            )
+            row = cursor.fetchone()
+            actual_id = str(row[0]) if row else f"vps-{uuid.uuid4().hex[:8]}"
+
+        existing_enc_pwd: str | None = None
+        existing_enc_key: str | None = None
+        created_at = now_iso
+
+        cursor.execute(
+            "SELECT encrypted_password, encrypted_key, created_at FROM vps_profiles WHERE id = ?",
+            (actual_id,),
+        )
+        existing_row = cursor.fetchone()
+        if existing_row:
+            existing_enc_pwd = existing_row[0]
+            existing_enc_key = existing_row[1]
+            created_at = existing_row[2] or now_iso
+
+        enc_password = self._vault.encrypt(password) if password else existing_enc_pwd
+        enc_key = self._vault.encrypt(key_content) if key_content else existing_enc_key
+
+        clean_name = name.strip() or f"{username.strip() or 'root'}@{host.strip()}"
+
+        with self._conn:
+            self._conn.execute(
+                """
+                INSERT OR REPLACE INTO vps_profiles
+                (id, name, host, port, username, encrypted_password, encrypted_key, default_preset, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    actual_id,
+                    clean_name,
+                    host.strip(),
+                    port,
+                    username.strip() or "root",
+                    enc_password,
+                    enc_key,
+                    default_preset,
+                    created_at,
+                    now_iso,
+                ),
+            )
+        return actual_id
+
+    def list_vps_profiles(self) -> list[dict[str, Any]]:
+        """List all saved VPS connection profiles without exposing raw credentials."""
+        cursor = self._conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, name, host, port, username, default_preset,
+                   encrypted_password, encrypted_key, updated_at
+            FROM vps_profiles
+            ORDER BY updated_at DESC
+            """
+        )
+        profiles: list[dict[str, Any]] = []
+        for row in cursor.fetchall():
+            profiles.append(
+                {
+                    "id": str(row["id"]),
+                    "name": str(row["name"]),
+                    "host": str(row["host"]),
+                    "port": int(row["port"]),
+                    "username": str(row["username"]),
+                    "default_preset": str(row["default_preset"]),
+                    "has_password": bool(row["encrypted_password"]),
+                    "has_key": bool(row["encrypted_key"]),
+                    "updated_at": str(row["updated_at"]),
+                }
+            )
+        return profiles
+
+    def get_vps_profile(self, profile_id: str, decrypt: bool = False) -> dict[str, Any] | None:
+        """Fetch a specific saved VPS profile, optionally decrypting credentials."""
+        cursor = self._conn.cursor()
+        cursor.execute("SELECT * FROM vps_profiles WHERE id = ?", (profile_id,))
+        row = cursor.fetchone()
+        if not row:
+            return None
+
+        result: dict[str, Any] = {
+            "id": str(row["id"]),
+            "name": str(row["name"]),
+            "host": str(row["host"]),
+            "port": int(row["port"]),
+            "username": str(row["username"]),
+            "default_preset": str(row["default_preset"]),
+            "has_password": bool(row["encrypted_password"]),
+            "has_key": bool(row["encrypted_key"]),
+            "created_at": str(row["created_at"]),
+            "updated_at": str(row["updated_at"]),
+        }
+        if decrypt:
+            result["password"] = self._vault.decrypt(row["encrypted_password"]) if row["encrypted_password"] else ""
+            result["key_content"] = self._vault.decrypt(row["encrypted_key"]) if row["encrypted_key"] else ""
+
+        return result
+
+    def delete_vps_profile(self, profile_id: str) -> bool:
+        """Delete a saved VPS profile."""
+        with self._conn:
+            cursor = self._conn.execute("DELETE FROM vps_profiles WHERE id = ?", (profile_id,))
+            return cursor.rowcount > 0
 
     def save_run(self, report: Report, run_id: str | None = None) -> str:
         """Persist a complete Report run into SQLite."""

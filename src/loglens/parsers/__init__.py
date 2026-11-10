@@ -1,5 +1,6 @@
 """Log parsers and autodetect engine."""
 
+from loglens.parsers.adaptive import AdaptiveMultiParser
 from loglens.parsers.auth_log import AuthLogParser
 from loglens.parsers.base import Parser, ParserRegistry, registry
 from loglens.parsers.database_auth import DatabaseAuthParser
@@ -26,9 +27,11 @@ registry.register(LaravelParser())
 registry.register(MinecraftParser())
 registry.register(PterodactylParser())
 registry.register(DockerJsonParser())
+registry.register(AdaptiveMultiParser())
 registry.register(GenericParser())
 
 __all__ = [
+    "AdaptiveMultiParser",
     "AuthLogParser",
     "DatabaseAuthParser",
     "DockerJsonParser",

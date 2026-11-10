@@ -43,19 +43,54 @@
 
     <!-- Remote VPS SSH Stream Form -->
     <div id="ssh-watch-section">
+      <!-- Saved VPS Profiles Selector -->
+      {% if saved_profiles %}
+        <div id="saved-profiles-bar" style="margin-bottom: 14px; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+            <div style="flex: 1;">
+              <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">
+                Saved VPS profiles
+              </label>
+              <select id="saved-vps-select" onchange="onSelectSavedProfile(this)" style="width: 100%; font-size: 12px;">
+                <option value="">-- Choose a saved VPS profile or enter details below --</option>
+                {% for prof in saved_profiles %}
+                  <option value="{{ prof.id }}"
+                          data-host="{{ prof.host }}"
+                          data-port="{{ prof.port }}"
+                          data-username="{{ prof.username }}"
+                          data-preset="{{ prof.default_preset }}"
+                          data-name="{{ prof.name }}"
+                          data-has-pwd="{{ 'true' if prof.has_password else 'false' }}"
+                          data-has-key="{{ 'true' if prof.has_key else 'false' }}">
+                    {{ prof.name }} ({{ prof.username }}@{{ prof.host }}:{{ prof.port }})
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <button type="button" id="delete-profile-btn" onclick="deleteSavedProfile()" class="btn btn-secondary btn-sm" style="display: none; height: 32px; margin-top: 18px; color: #f87171; border-color: rgba(239,68,68,0.3);" title="Delete saved profile">
+              Delete
+            </button>
+          </div>
+          <div id="saved-profile-badge" style="display: none; font-size: 11px; color: #34d399; margin-top: 6px; font-family: var(--font-mono);">
+            🔒 Saved credentials loaded from local encrypted vault
+          </div>
+        </div>
+      {% endif %}
+
       <form action="/live/ssh/start" method="post">
+        <input type="hidden" name="profile_id" id="profile-id-input" value="">
         <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 10px;">
           <div>
             <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">
               VPS IP / Host
             </label>
-            <input type="text" name="host" required placeholder="e.g. 222.167.207.101" style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+            <input type="text" name="host" id="ssh-host-input" required placeholder="e.g. 222.167.207.101" style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
           </div>
           <div>
             <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">
               SSH port
             </label>
-            <input type="number" name="port" value="22" min="1" max="65535" style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+            <input type="number" name="port" id="ssh-port-input" value="22" min="1" max="65535" style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
           </div>
         </div>
 
@@ -64,13 +99,13 @@
             <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">
               Username
             </label>
-            <input type="text" name="username" value="root" required style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+            <input type="text" name="username" id="ssh-user-input" value="root" required style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
           </div>
           <div>
             <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; font-weight: 500;">
               Password
             </label>
-            <input type="password" name="password" placeholder="Root / user password" style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
+            <input type="password" name="password" id="ssh-pass-input" placeholder="Root / user password" style="width: 100%; font-family: var(--font-mono); font-size: 12px;">
           </div>
         </div>
 
@@ -79,7 +114,8 @@
             Target log source preset
           </label>
           <select name="preset" id="ssh-preset-select" onchange="toggleCustomCmd(this.value)" style="width: 100%; font-size: 12px;">
-            <option value="pelican-compose">Pelican Panel — Live Docker Compose logs (recommended)</option>
+            <option value="smart-auto" selected>✨ Smart Auto-Detect &amp; Stream All Active Logs (Unified Stream - Recommended)</option>
+            <option value="pelican-compose">Pelican Panel — Live Docker Compose logs</option>
             <option value="pelican-app">Pelican Panel — Laravel error log (storage/logs/laravel-*.log)</option>
             <option value="pelican-caddy">Pelican Panel — Caddy web reverse proxy logs</option>
             <option value="cyberpanel-ols">CyberPanel — OpenLiteSpeed access.log (/usr/local/lsws/logs/access.log)</option>
@@ -98,14 +134,28 @@
         </div>
 
         <!-- Optional SSH Key Accordion -->
-        <details style="margin-bottom: 14px;">
+        <details style="margin-bottom: 12px;">
           <summary style="font-size: 11px; color: var(--accent); cursor: pointer; user-select: none;">
             Or use Private Key instead of password
           </summary>
           <div style="margin-top: 6px;">
-            <textarea name="key_content" rows="3" placeholder="Paste OpenSSH or RSA private key (-----BEGIN OPENSSH PRIVATE KEY-----)..." style="width: 100%; font-family: var(--font-mono); font-size: 11px; resize: vertical;"></textarea>
+            <textarea name="key_content" id="ssh-key-input" rows="3" placeholder="Paste OpenSSH or RSA private key (-----BEGIN OPENSSH PRIVATE KEY-----)..." style="width: 100%; font-family: var(--font-mono); font-size: 11px; resize: vertical;"></textarea>
           </div>
         </details>
+
+        <!-- Save Server Profile Checkbox -->
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin-bottom: 14px;">
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-primary); cursor: pointer; user-select: none;">
+            <input type="checkbox" name="remember_server" id="remember-server-check" value="true" checked style="accent-color: var(--accent);">
+            <span>Remember this server credentials securely (local encrypted vault)</span>
+          </label>
+          <div style="margin-top: 8px;">
+            <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 3px; font-weight: 500;">
+              Profile name (optional)
+            </label>
+            <input type="text" name="profile_name" id="profile-name-input" placeholder="e.g. Production VPS" style="width: 100%; font-size: 12px;">
+          </div>
+        </div>
 
         <div style="display: flex; gap: 8px; flex-wrap: wrap;">
           <button type="submit" class="btn btn-primary" style="flex: 1; min-width: 180px;">
@@ -429,6 +479,75 @@ function toggleCustomCmd(val) {
   const customBox = document.getElementById('custom-cmd-box');
   if (customBox) {
     customBox.style.display = (val === 'custom') ? 'block' : 'none';
+  }
+}
+
+function onSelectSavedProfile(selectElem) {
+  const selectedOption = selectElem.options[selectElem.selectedIndex];
+  const profileId = selectElem.value;
+  const deleteBtn = document.getElementById('delete-profile-btn');
+  const badge = document.getElementById('saved-profile-badge');
+  const idInput = document.getElementById('profile-id-input');
+  const hostInput = document.getElementById('ssh-host-input');
+  const portInput = document.getElementById('ssh-port-input');
+  const userInput = document.getElementById('ssh-user-input');
+  const passInput = document.getElementById('ssh-pass-input');
+  const keyInput = document.getElementById('ssh-key-input');
+  const presetSelect = document.getElementById('ssh-preset-select');
+  const nameInput = document.getElementById('profile-name-input');
+
+  if (!profileId) {
+    if (idInput) idInput.value = '';
+    if (deleteBtn) deleteBtn.style.display = 'none';
+    if (badge) badge.style.display = 'none';
+    if (passInput) passInput.placeholder = 'Root / user password';
+    if (keyInput) keyInput.placeholder = 'Paste OpenSSH or RSA private key...';
+    return;
+  }
+
+  if (idInput) idInput.value = profileId;
+  if (hostInput) hostInput.value = selectedOption.dataset.host || '';
+  if (portInput) portInput.value = selectedOption.dataset.port || '22';
+  if (userInput) userInput.value = selectedOption.dataset.username || 'root';
+  if (presetSelect) presetSelect.value = selectedOption.dataset.preset || 'smart-auto';
+  if (nameInput) nameInput.value = selectedOption.dataset.name || '';
+
+  const hasPwd = selectedOption.dataset.hasPwd === 'true';
+  const hasKey = selectedOption.dataset.hasKey === 'true';
+
+  if (passInput) {
+    passInput.value = '';
+    passInput.placeholder = hasPwd ? '•••••••• [Saved in local vault]' : 'Root / user password';
+  }
+  if (keyInput) {
+    keyInput.value = '';
+    keyInput.placeholder = hasKey ? '[SSH private key stored in local vault]' : 'Paste OpenSSH or RSA private key...';
+  }
+
+  if (deleteBtn) deleteBtn.style.display = 'inline-block';
+  if (badge) badge.style.display = 'block';
+}
+
+async function deleteSavedProfile() {
+  const selectElem = document.getElementById('saved-vps-select');
+  if (!selectElem || !selectElem.value) return;
+  const profileId = selectElem.value;
+  const confirmed = confirm('Delete this saved VPS profile from local vault?');
+  if (!confirmed) return;
+
+  try {
+    const res = await fetch('/api/live/ssh/profiles/' + encodeURIComponent(profileId), {
+      method: 'DELETE',
+    });
+    if (res.ok) {
+      selectElem.remove(selectElem.selectedIndex);
+      selectElem.value = '';
+      onSelectSavedProfile(selectElem);
+    } else {
+      alert('Failed to delete profile.');
+    }
+  } catch (err) {
+    console.error('Failed to delete profile:', err);
   }
 }
 </script>
