@@ -10,6 +10,8 @@
 
 LogLens transforms noisy security logs into structured, high-confidence forensic intelligence. It ingests system and web logs, compresses them into signature templates using **Drain3**, matches 18+ deterministic **MITRE ATT&CK rules**, and optionally routes **redacted, injection-safe cluster summaries** to local LLMs (Ollama) or cloud providers to explain incidents, evaluate severity, and recommend actionable containment steps.
 
+![LogLens Security Triage Dashboard](docs/img/dashboard.png)
+
 ---
 
 ## 🏛️ Architecture & Pipeline
@@ -32,7 +34,7 @@ flowchart LR
 
 - **100% Offline by Default**: Designed to run seamlessly with local LLMs via Ollama. No data ever leaves your perimeter without explicit configuration and consent.
 - **High-Entropy Token Redaction**: Reversible masking scrubs IPv4, IPv6, email addresses, Bearer tokens, JWTs, and AWS credentials *prior* to LLM analysis.
-- **Extreme Token Efficiency**: Drain3 clusters compress 50,000+ raw log lines into ~15 representative templates—reducing LLM token consumption and costs by **over 99%**.
+- **Extreme Token Efficiency**: Drain3 clusters compress 50,000+ raw log lines into ~14 representative templates—reducing LLM token consumption and costs by **over 99%** (estimated on a synthetic 50k-line auth log, methodology in docs/benchmarks.md).
 - **Adversarial Prompt-Injection Defense**: Log messages are strictly quarantined within `<untrusted_log_cluster>` boundary tags. The LLM has zero tools, zero network egress, and zero execution privileges.
 - **XSS & SQLi Proof**: Dynamic report fields are escaped using `html.escape()`; storage relies 100% on parameterized SQLite queries.
 
@@ -62,10 +64,10 @@ Other shortcuts:
 #### 1. Install LogLens
 ```bash
 # Recommended via pipx
-pipx install loglens
+pipx install git+https://github.com/ItsAdi22/LogLens-AI-Assisted-Security-Log-Triage
 
 # Or standard pip
-pip install loglens
+pip install git+https://github.com/ItsAdi22/LogLens-AI-Assisted-Security-Log-Triage
 ```
 
 ### 2. Analyze Logs in Rule-Only Offline Mode (Zero LLM setup required)
@@ -85,12 +87,13 @@ loglens analyze /var/log/nginx/access.log --llm --provider ollama --out report.h
 Run LogLens in a lightweight, non-root isolated container:
 
 ```bash
-# Analyze host logs mounted read-only
-docker run --rm -v /var/log:/logs:ro ghcr.io/itsadi22/loglens:v1.0.0 analyze /logs/auth.log --no-llm
+# Build and run with host logs mounted read-only
+docker build -t loglens .
+docker run --rm -v /var/log:/logs:ro loglens analyze /logs/auth.log --no-llm
 
-# Run with full Ollama stack via docker-compose
-docker compose up -d
-docker compose exec loglens loglens analyze /logs/auth.log --llm --provider ollama
+# Or run with full Ollama stack via docker compose
+docker compose up -d --build
+docker compose exec loglens loglens analyze /logs/sample_auth.log --no-llm
 ```
 
 ---
@@ -100,7 +103,7 @@ docker compose exec loglens loglens analyze /logs/auth.log --llm --provider olla
 | Capability | `grep` / `fail2ban` | Wazuh / Elastic SIEM | **LogLens** |
 |---|---|---|---|
 | **Setup Time** | < 5 mins | Days / Complex | **< 2 minutes** |
-| **Footprint** | Tiny | 4GB+ RAM JVM cluster | **< 65MB RAM constant** |
+| **Footprint** | Tiny | 4GB+ RAM JVM cluster | **~12 MB peak (50k-line sample)** |
 | **Clustering** | ❌ None | ❌ Complex indexing | **✅ Drain3 automatic template mining** |
 | **AI Explanation** | ❌ None | ❌ None / Expensive add-on | **✅ Local Ollama, Gemini, OpenAI, Claude** |
 | **Reversible Redaction**| ❌ None | ❌ Manual filters | **✅ Built-in multi-pattern redactor** |
