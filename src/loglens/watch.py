@@ -11,7 +11,7 @@ import threading
 import time
 import uuid
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from types import FrameType
 from typing import Any
@@ -26,6 +26,15 @@ from loglens.rules import RuleEngine, get_builtin_rules
 from loglens.store import StorageManager
 
 logger = logging.getLogger(__name__)
+
+IST = timezone(timedelta(hours=5, minutes=30), name="IST")
+
+
+def _to_ist(dt: datetime) -> datetime:
+    """Ensure datetime has timezone and convert to Indian Standard Time (IST)."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(IST)
 
 
 class WatchMonitor:
@@ -626,11 +635,11 @@ class LiveWatchManager:
                         "log_path": s.source_label,
                         "file_name": s.source_label if s.is_ssh else s.log_path.name,
                         "status": s.status,
-                        "started_at": s.started_at.strftime("%Y-%m-%d %H:%M:%S UTC"),
+                        "started_at": _to_ist(s.started_at).strftime("%Y-%m-%d %H:%M:%S IST"),
                         "total_findings": s.total_findings,
                         "total_lines": s.total_lines,
                         "total_events": s.total_events,
-                        "last_activity": s.last_activity.strftime("%Y-%m-%d %H:%M:%S UTC"),
+                        "last_activity": _to_ist(s.last_activity).strftime("%Y-%m-%d %H:%M:%S IST"),
                         "is_ssh": s.is_ssh,
                         "run_id": s.run_id,
                         "error": s.error,
@@ -649,7 +658,7 @@ class LiveWatchManager:
         """Append an entry to the rolling live activity feed."""
         self.recent_activities.appendleft(
             {
-                "timestamp": datetime.now(UTC).strftime("%H:%M:%S"),
+                "timestamp": datetime.now(IST).strftime("%H:%M:%S IST"),
                 "source": source,
                 "event_count": event_count,
                 "findings_count": findings_count,

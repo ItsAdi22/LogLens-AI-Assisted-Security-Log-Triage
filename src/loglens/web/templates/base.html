@@ -351,6 +351,38 @@
       font-size: 12px;
     }
 
+    .filter-chip {
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+      font-family: inherit;
+      line-height: 1.4;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      outline: none;
+    }
+
+    .filter-chip:hover {
+      background: var(--bg-raised);
+      color: var(--text-primary);
+      border-color: var(--border-strong);
+    }
+
+    .filter-chip.active {
+      background: var(--btn-primary-bg);
+      color: var(--btn-primary-text);
+      border-color: var(--btn-primary-bg);
+      font-weight: 600;
+    }
+
     input[type="text"], input[type="password"], input[type="url"], input[type="number"], select, textarea {
       background: var(--bg-card);
       color: var(--text-primary);

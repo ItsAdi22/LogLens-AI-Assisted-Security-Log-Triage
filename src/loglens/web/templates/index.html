@@ -156,7 +156,7 @@
                   {% endif %}
                 </div>
               </td>
-              <td style="color: var(--text-secondary); font-size: 12px; font-variant-numeric: tabular-nums;">{{ run.generated_at }}</td>
+              <td style="color: var(--text-secondary); font-size: 12px; font-variant-numeric: tabular-nums;">{{ run.generated_at|ist }}</td>
               <td><span class="code">{{ run.log_source }}</span></td>
               <td style="font-variant-numeric: tabular-nums;">{{ "{:,}".format(run.parsed_events) }}</td>
               <td style="font-variant-numeric: tabular-nums;">{{ run.total_clusters }}</td>

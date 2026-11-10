@@ -5,10 +5,10 @@
       <div style="flex: 1; min-width: 0;">
         <span class="badge badge-{{ finding.rule_severity|lower }}">{{ finding.rule_severity }}</span>
         <span style="font-weight: 600; margin-left: 8px; font-size: 14px; color: var(--text-primary);">
-          {% if finding.llm and finding.llm.attack_type %}
-            {{ finding.llm.attack_type|replace('_', ' ')|title }}
-          {% elif finding.rule_ids %}
+          {% if finding.rule_ids %}
             {{ finding.rule_ids|join(', ') }}
+          {% elif finding.llm and finding.llm.attack_type %}
+            {{ finding.llm.attack_type|replace('_', ' ')|title }}
           {% else %}
             Security anomaly
           {% endif %}
@@ -85,7 +85,7 @@
           <div style="color: var(--text-muted); font-size: 12px;">
             Rule triggered without forensic explanation
           </div>
-          <form hx-post="/runs/{{ run_id }}/findings/{{ finding.id }}/explain" hx-target="#finding-{{ finding.id }}-assessment" hx-swap="outerHTML" style="margin: 0;">
+          <form hx-post="/runs/{{ run_id }}/findings/{{ finding.id }}/explain" hx-target="#finding-{{ finding.id }}-card" hx-swap="outerHTML" style="margin: 0;">
             <button type="submit" class="btn btn-primary btn-sm">
               Explain with AI
             </button>

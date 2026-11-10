@@ -194,6 +194,9 @@
                   {{ s.log_path }} &bull;
                   <span style="color: var(--accent); font-weight: 500; font-variant-numeric: tabular-nums;">{{ s.total_lines or 0 }} lines</span> &bull;
                   <span style="font-variant-numeric: tabular-nums;">{{ s.total_findings or 0 }} findings</span>
+                  {% if s.last_activity %}
+                    &bull; <span style="font-variant-numeric: tabular-nums;">Active: {{ s.last_activity }}</span>
+                  {% endif %}
                 </div>
               </div>
               <div>

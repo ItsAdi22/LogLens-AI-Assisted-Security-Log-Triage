@@ -6,7 +6,7 @@ import html
 import logging
 import os
 import urllib.parse
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -45,6 +45,27 @@ STATIC_DIR = MODULE_DIR / "static"
 TEMPLATES_DIR = MODULE_DIR / "templates"
 
 logger = logging.getLogger(__name__)
+
+IST = timezone(timedelta(hours=5, minutes=30), name="IST")
+
+
+def format_ist(value: Any, fmt: str = "%Y-%m-%d %H:%M:%S IST") -> str:
+    """Format any datetime or ISO string to Indian Standard Time (IST)."""
+    if not value:
+        return ""
+    if isinstance(value, str):
+        try:
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return value
+    elif isinstance(value, datetime):
+        dt = value
+    else:
+        return str(value)
+
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(IST).strftime(fmt)
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -179,6 +200,7 @@ def create_app(
 
     # Jinja2 template rendering
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+    templates.env.filters["ist"] = format_ist
 
     # Storage manager
     actual_db_path = db_path or os.environ.get("LOGLENS_DB_PATH") or DEFAULT_DB_PATH

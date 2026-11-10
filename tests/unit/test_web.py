@@ -803,3 +803,92 @@ def test_live_ssh_test_endpoint(tmp_path: Path) -> None:
         assert "Pelican directory" in res.text
 
 
+def test_format_ist_filter() -> None:
+    from loglens.web.app import format_ist
+
+    # 1. UTC datetime to IST (+5:30)
+    dt_utc = datetime(2026, 11, 10, 9, 0, 0, tzinfo=UTC)
+    formatted = format_ist(dt_utc)
+    assert formatted == "2026-11-10 14:30:00 IST"
+
+    # 2. Naive datetime assumes UTC
+    dt_naive = datetime(2026, 11, 10, 9, 0, 0)
+    assert format_ist(dt_naive) == "2026-11-10 14:30:00 IST"
+
+    # 3. ISO string format
+    iso_str = "2026-11-10T09:00:00Z"
+    assert format_ist(iso_str) == "2026-11-10 14:30:00 IST"
+
+    # 4. Fallback for non-date string
+    assert format_ist("not-a-date") == "not-a-date"
+    assert format_ist(None) == ""
+
+
+def test_finding_title_preserves_rule_id_after_explain(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    storage = StorageManager(db_file)
+
+    cluster = Cluster(
+        id="c-01",
+        template="Accepted password for root from <*>",
+        count=1,
+        first_seen=datetime.now(UTC),
+        last_seen=datetime.now(UTC),
+        top_fields={"ip": [("222.167.207.101", 1)]},
+    )
+    finding = Finding(
+        id="finding-ssh-root-login-003",
+        cluster_ids=["c-01"],
+        rule_ids=["ssh-root-login-003"],
+        rule_severity="low",
+        llm=None,
+    )
+    metadata = ReportMetadata(
+        generated_at=datetime.now(UTC),
+        log_source="vps-stream",
+        total_lines=10,
+        parsed_events=10,
+        unparsed_lines=0,
+        total_clusters=1,
+        findings_count=1,
+    )
+    report = Report(metadata=metadata, findings=[finding], clusters=[cluster])
+    run_id = storage.save_run(report, run_id="run-reanalyze-test")
+    storage.close()
+
+    app = create_app(db_path=db_file, provider_name="mock")
+    client = TestClient(app)
+
+    # Post HTMX explain request
+    response = client.post(f"/runs/{run_id}/findings/finding-ssh-root-login-003/explain")
+    assert response.status_code == 200
+
+    # Ensure title retains concrete rule ID and does NOT change to generic Security Anomaly
+    assert "ssh-root-login-003" in response.text
+    # Ensure form targets the outer card to avoid nesting card inside assessment block
+    assert 'hx-target="#finding-finding-ssh-root-login-003-card"' in response.text
+    assert 'hx-swap="outerHTML"' in response.text
+
+
+def test_ist_rendered_in_index_and_run_detail(tmp_path: Path) -> None:
+    db_file = tmp_path / "test.db"
+    storage = StorageManager(db_file)
+    report = create_sample_report()
+    run_id = storage.save_run(report, run_id="run-ist-test")
+    storage.close()
+
+    app = create_app(db_path=db_file)
+    client = TestClient(app)
+
+    # Index page should render IST in history table
+    res_index = client.get("/")
+    assert res_index.status_code == 200
+    assert "IST" in res_index.text
+
+    # Run detail page should render IST in header and clusters table
+    res_run = client.get(f"/runs/{run_id}")
+    assert res_run.status_code == 200
+    assert "IST" in res_run.text
+
+
+

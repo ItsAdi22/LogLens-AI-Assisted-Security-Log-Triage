@@ -11,7 +11,7 @@
     <div>
       <h1 style="font-size: 18px; font-weight: 600; font-family: var(--font-mono);">{{ run_id }}</h1>
       <p style="color: var(--text-secondary); font-size: 12px; margin-top: 2px;">
-        Source: <span class="code">{{ report.metadata.log_source }}</span> &bull; <span style="font-variant-numeric: tabular-nums;">{{ report.metadata.generated_at }}</span>
+        Source: <span class="code">{{ report.metadata.log_source }}</span> &bull; <span style="font-variant-numeric: tabular-nums;">{{ report.metadata.generated_at|ist }}</span>
       </p>
     </div>
     <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
@@ -180,6 +180,9 @@
             <td>
               <div style="font-family: var(--font-mono); font-size: 12px; word-break: break-all;">
                 {{ cluster.template|replace('<*>', '<span class="wildcard">&lt;*&gt;</span>')|safe }}
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px; font-variant-numeric: tabular-nums;">
+                <span>Activity: {{ cluster.first_seen|ist }} &rarr; {{ cluster.last_seen|ist }}</span>
               </div>
             </td>
             <td style="font-variant-numeric: tabular-nums; text-align: right; font-weight: 500;">
